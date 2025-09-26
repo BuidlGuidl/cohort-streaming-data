@@ -17,7 +17,7 @@ export interface CsvStoreState {
   uploadedAt: Date | null;
   setCsvData: (data: CsvTransaction[], fileName: string) => void;
   clearCsvData: () => void;
-  getInternalCohortStreams: () => CsvTransaction[];
+  getInternalCohortStreams: (startDate?: string, endDate?: string) => CsvTransaction[];
 }
 
 export const useCsvStore = create<CsvStoreState>()(
@@ -38,9 +38,31 @@ export const useCsvStore = create<CsvStoreState>()(
           fileName: null,
           uploadedAt: null,
         }),
-      getInternalCohortStreams: () => {
+      getInternalCohortStreams: (startDate?: string, endDate?: string) => {
         const { csvData } = get();
-        return csvData.filter(transaction => transaction.account?.toLowerCase() === "internal cohort streams");
+        let filtered = csvData.filter(transaction =>
+          transaction.account?.toLowerCase().includes("internal cohort streams"),
+        );
+
+        // Apply date filtering if dates are provided
+        if (startDate || endDate) {
+          filtered = filtered.filter(transaction => {
+            // Try to extract date from the transaction - look for a Date Time field or similar
+            const dateField =
+              transaction["Date Time"] || transaction["date"] || transaction["Date"] || transaction["timestamp"];
+            if (!dateField) return true; // If no date field found, include the transaction
+
+            // Parse the date (assuming ISO format like "2025-09-23T05:48:23.000-06:00")
+            const transactionDate = new Date(dateField).toISOString().split("T")[0];
+
+            if (startDate && transactionDate < startDate) return false;
+            if (endDate && transactionDate > endDate) return false;
+
+            return true;
+          });
+        }
+
+        return filtered;
       },
     }),
     {

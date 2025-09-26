@@ -2,6 +2,57 @@
 
 import { useMemo, useState } from "react";
 import { useCsvStore } from "~~/services/store/csvStore";
+import { useDateStore } from "~~/services/store/dateStore";
+
+// Utility function to parse ENS name from Excel hyperlink formula
+// Example input: =hyperlink("https://optimistic.etherscan.io/address/0x45334f41aaa464528cd5bc0f582acadc49eb0cd1","oxrinat.eth streams")
+// Expected output: "oxrinat.eth"
+const parseEnsFromHyperlink = (hyperlinkString: string): string => {
+  if (!hyperlinkString) return "";
+
+  // Handle Excel hyperlink format: =HYPERLINK("url","display text")
+  const hyperlinkMatch = hyperlinkString.match(/=HYPERLINK\(".*?","(.*)"\)/i);
+  if (hyperlinkMatch && hyperlinkMatch[1]) {
+    let displayText = hyperlinkMatch[1].trim();
+
+    // Remove common suffixes like " streams", " cohort", etc.
+    displayText = displayText.replace(/\s+(streams?|cohorts?|wallet)$/i, "");
+
+    // If it looks like an ENS name (contains .eth), return it
+    if (displayText.includes(".eth")) {
+      return displayText;
+    }
+
+    // If it's not obviously an ENS name but is clean text and reasonable length, return it
+    if (
+      displayText &&
+      !displayText.startsWith("0x") &&
+      !displayText.includes("http") &&
+      displayText.length < 30 &&
+      displayText.length > 2
+    ) {
+      return displayText;
+    }
+  }
+
+  // If no hyperlink format, check if it's already an ENS name
+  if (hyperlinkString.includes(".eth") && !hyperlinkString.includes("=")) {
+    return hyperlinkString.replace(/\s+(streams?|cohorts?|wallet)$/i, "").trim();
+  }
+
+  // If it's a plain address, don't try to parse it as ENS
+  if (hyperlinkString.startsWith("0x") && hyperlinkString.length >= 10) {
+    return ""; // Return empty so we fall back to address display
+  }
+
+  // If it contains hyperlink artifacts, return empty
+  if (hyperlinkString.includes("=HYPERLINK") || hyperlinkString.includes("https://")) {
+    return "";
+  }
+
+  // Last resort - return empty to fall back to address
+  return "";
+};
 
 interface AccountingBuilderStatsProps {
   className?: string;
@@ -22,21 +73,46 @@ interface AccountingBuilderData {
 
 export const AccountingBuilderStats = ({ className = "" }: AccountingBuilderStatsProps) => {
   const { getInternalCohortStreams } = useCsvStore();
-  const internalCohortData = getInternalCohortStreams();
+  const { startDate, endDate } = useDateStore();
+  const internalCohortData = getInternalCohortStreams(startDate, endDate);
 
   // Process CSV data into builder stats
   const builderStats = useMemo(() => {
     const builderMap = new Map<string, AccountingBuilderData>();
 
     internalCohortData.forEach(transaction => {
-      const builderAddress = transaction.to?.toLowerCase() || "";
+      // Parse the "To" field which might be a hyperlink formula
+      const toField = transaction.to || "";
+
+      // Extract Ethereum address from hyperlink if present
+      let builderAddress = "";
+      const addressMatch = toField.match(/0x[a-fA-F0-9]{40}/);
+      if (addressMatch) {
+        builderAddress = addressMatch[0].toLowerCase();
+      } else if (toField.startsWith("0x")) {
+        builderAddress = toField.toLowerCase();
+      }
 
       if (!builderAddress) return;
 
+      // Parse display name (ENS) from the hyperlink
+      const displayName = parseEnsFromHyperlink(toField);
+
       if (!builderMap.has(builderAddress)) {
+        // Clean up display name - if it's not a valid ENS or clean name, fall back to address
+        let cleanDisplayName = displayName;
+        if (
+          !cleanDisplayName ||
+          cleanDisplayName.includes("=HYPERLINK") ||
+          cleanDisplayName.includes("https://") ||
+          cleanDisplayName.length > 50
+        ) {
+          cleanDisplayName = builderAddress.slice(0, 6) + "..." + builderAddress.slice(-4);
+        }
+
         builderMap.set(builderAddress, {
           address: builderAddress,
-          displayName: builderAddress.slice(0, 6) + "..." + builderAddress.slice(-4),
+          displayName: cleanDisplayName,
           totalEthAmount: 0,
           totalFiatAmount: 0,
           withdrawalCount: 0,
@@ -55,8 +131,19 @@ export const AccountingBuilderStats = ({ className = "" }: AccountingBuilderStat
       });
     });
 
-    // Sort by total ETH amount (descending)
-    return Array.from(builderMap.values()).sort((a, b) => b.totalEthAmount - a.totalEthAmount);
+    // Sort by total ETH amount (descending) and sort each builder's withdrawals by date (newest first)
+    const result = Array.from(builderMap.values()).sort((a, b) => b.totalEthAmount - a.totalEthAmount);
+
+    // Sort each builder's withdrawals by date (newest first)
+    result.forEach(builder => {
+      builder.withdrawals.sort((a, b) => {
+        const dateA = new Date(a["Date Time"] || a["date"] || a["Date"] || 0).getTime();
+        const dateB = new Date(b["Date Time"] || b["date"] || b["Date"] || 0).getTime();
+        return dateB - dateA; // Newest first
+      });
+    });
+
+    return result;
   }, [internalCohortData]);
 
   // Calculate summary stats
@@ -158,8 +245,18 @@ const AccountingBuilderRow = ({ builder }: AccountingBuilderRowProps) => {
         onClick={() => setShowDetails(!showDetails)}
       >
         <td>
-          <div className="font-semibold">{builder.displayName}</div>
-          <div className="text-xs opacity-70 font-mono">{builder.address}</div>
+          {builder.displayName === builder.address.slice(0, 6) + "..." + builder.address.slice(-4) ? (
+            // No ENS name - show only the full shortened address
+            <div className="font-semibold text-lg font-mono">{builder.displayName}</div>
+          ) : (
+            // Has ENS name - show ENS with address below
+            <>
+              <div className="font-semibold text-lg">{builder.displayName}</div>
+              <div className="text-xs opacity-70 font-mono">
+                {builder.address.slice(0, 6)}...{builder.address.slice(-4)}
+              </div>
+            </>
+          )}
         </td>
         <td className="text-center">
           <div className="font-mono font-bold text-lg">{builder.totalEthAmount.toFixed(4)} ETH</div>
@@ -182,20 +279,39 @@ const AccountingBuilderRow = ({ builder }: AccountingBuilderRowProps) => {
               </h4>
               <div className="max-h-64 overflow-y-auto pr-2">
                 <div className="space-y-3">
-                  {builder.withdrawals.map((withdrawal, idx) => (
-                    <div key={idx} className="bg-base-100 p-3 rounded-lg border border-base-300 shadow-sm">
-                      <div className="flex flex-wrap items-center gap-2 mb-2">
-                        <span className="badge badge-success font-mono font-bold">
-                          {withdrawal.ethAmount.toFixed(4)} ETH
-                        </span>
-                        <span className="badge badge-info font-mono font-bold">
-                          ${withdrawal.fiatAmount.toFixed(2)}
-                        </span>
-                        <span className="badge badge-ghost text-xs">From: {withdrawal.from?.slice(0, 10)}...</span>
+                  {builder.withdrawals.map((withdrawal, idx) => {
+                    // Parse clean names from hyperlink formulas
+                    const fromName = parseEnsFromHyperlink(withdrawal.from || "") || "Unknown Source";
+                    const toName = parseEnsFromHyperlink(withdrawal.to || "") || builder.displayName;
+                    const dateField = withdrawal["Date Time"] || withdrawal["date"] || withdrawal["Date"];
+                    const formattedDate = dateField ? new Date(dateField).toLocaleDateString() : "Unknown Date";
+                    const account = withdrawal.account || "Unknown Account";
+
+                    return (
+                      <div key={idx} className="bg-base-100 p-3 rounded-lg border border-base-300 shadow-sm">
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
+                          <span className="badge badge-success font-mono font-bold">
+                            {withdrawal.ethAmount.toFixed(4)} ETH
+                          </span>
+                          <span className="badge badge-info font-mono font-bold">
+                            ${withdrawal.fiatAmount.toFixed(2)}
+                          </span>
+                          <span className="badge badge-ghost text-xs">{formattedDate}</span>
+                        </div>
+                        <div className="text-sm text-base-content/70">
+                          <div className="mb-1">
+                            <span className="font-medium">From:</span> {fromName}
+                          </div>
+                          <div className="mb-1">
+                            <span className="font-medium">To:</span> {toName}
+                          </div>
+                          <div className="italic">
+                            <span className="font-medium">Account:</span> {account}
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-sm text-base-content/70 font-mono">To: {withdrawal.to}</div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>

@@ -3,23 +3,30 @@
 import { useCallback, useRef, useState } from "react";
 import Papa from "papaparse";
 import { type CsvTransaction, useCsvStore } from "~~/services/store/csvStore";
+import { useDateStore } from "~~/services/store/dateStore";
 
 interface CsvUploadProps {
   className?: string;
+  onUploadSuccess?: () => void;
 }
 
-export const CsvUpload = ({ className = "" }: CsvUploadProps) => {
+export const CsvUpload = ({ className = "", onUploadSuccess }: CsvUploadProps) => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { csvData, fileName, uploadedAt, setCsvData, clearCsvData, getInternalCohortStreams } = useCsvStore();
+  const { startDate, endDate } = useDateStore();
 
-  const handleFileUpload = useCallback(
-    (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      if (!file) return;
+  const processFile = useCallback(
+    (file: File) => {
+      // Validate file type
+      if (!file.name.toLowerCase().endsWith(".csv")) {
+        setUploadError("Please upload a CSV file");
+        return;
+      }
 
       setIsUploading(true);
       setUploadError(null);
@@ -36,22 +43,67 @@ export const CsvUpload = ({ className = "" }: CsvUploadProps) => {
 
             const data = results.data as any[];
 
-            // Validate required columns
-            const requiredColumns = ["ETH Out", "FIAT Out", "To", "From", "Account"];
+            // Validate that we have data
+            if (data.length === 0) {
+              throw new Error("CSV file appears to be empty");
+            }
+
             const headers = Object.keys(data[0] || {});
-            const missingColumns = requiredColumns.filter(col => !headers.includes(col));
+
+            // Find the relevant columns using flexible matching
+            const ethOutColumn = headers.find(
+              h =>
+                h.toLowerCase().includes("token amount out") ||
+                h.toLowerCase().includes("amount out") ||
+                h.toLowerCase().includes("eth out"),
+            );
+
+            const fiatOutColumn = headers.find(
+              h =>
+                h.toLowerCase().includes("fiat value out") ||
+                h.toLowerCase().includes("fiat out") ||
+                h.toLowerCase().includes("usd out"),
+            );
+
+            const toColumn = headers.find(
+              h =>
+                h.toLowerCase().includes("to wallet") ||
+                h.toLowerCase().includes("to") ||
+                h.toLowerCase().includes("recipient"),
+            );
+
+            const fromColumn = headers.find(
+              h =>
+                h.toLowerCase().includes("from wallet") ||
+                h.toLowerCase().includes("from") ||
+                h.toLowerCase().includes("sender"),
+            );
+
+            const accountColumn = headers.find(
+              h => h.toLowerCase().includes("account") || h.toLowerCase().includes("category"),
+            );
+
+            // Validate that we found the essential columns
+            const missingColumns = [];
+            if (!ethOutColumn) missingColumns.push("Token Amount Out / ETH Out");
+            if (!fiatOutColumn) missingColumns.push("Fiat Value Out / FIAT Out");
+            if (!toColumn) missingColumns.push("To Wallet / To");
+            if (!fromColumn) missingColumns.push("From Wallet / From");
+            if (!accountColumn) missingColumns.push("Account");
 
             if (missingColumns.length > 0) {
-              throw new Error(`Missing required columns: ${missingColumns.join(", ")}`);
+              throw new Error(
+                `Could not find columns for: ${missingColumns.join(", ")}. Available columns: ${headers.join(", ")}`,
+              );
             }
 
             // Process and normalize data
             const processedData: CsvTransaction[] = data.map((row: any) => ({
-              ethOut: parseFloat(row["ETH Out"]) || 0,
-              fiatOut: parseFloat(row["FIAT Out"]) || 0,
-              to: row["To"] || "",
-              from: row["From"] || "",
-              account: row["Account"] || "",
+              ethOut: parseFloat(row[ethOutColumn!]) || 0,
+              fiatOut: parseFloat(row[fiatOutColumn!]) || 0,
+              to: row[toColumn!] || "",
+              from: row[fromColumn!] || "",
+              account: row[accountColumn!] || "",
               ...row, // Keep any additional fields
             }));
 
@@ -61,6 +113,13 @@ export const CsvUpload = ({ className = "" }: CsvUploadProps) => {
             // Reset file input
             if (fileInputRef.current) {
               fileInputRef.current.value = "";
+            }
+
+            // Call onUploadSuccess callback if provided
+            if (onUploadSuccess) {
+              setTimeout(() => {
+                onUploadSuccess();
+              }, 1500); // Give time to show success message
             }
           } catch (error) {
             setUploadError(error instanceof Error ? error.message : "Failed to process CSV file");
@@ -77,13 +136,63 @@ export const CsvUpload = ({ className = "" }: CsvUploadProps) => {
     [setCsvData],
   );
 
+  const handleFileUpload = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      processFile(file);
+    },
+    [processFile, onUploadSuccess],
+  );
+
+  // Drag and drop handlers
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+  }, []);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragOver(false);
+
+      const files = Array.from(e.dataTransfer.files);
+      const csvFile = files.find(file => file.name.toLowerCase().endsWith(".csv"));
+
+      if (!csvFile) {
+        setUploadError("Please drop a CSV file");
+        return;
+      }
+
+      if (files.length > 1) {
+        setUploadError("Please drop only one CSV file at a time");
+        return;
+      }
+
+      processFile(csvFile);
+    },
+    [processFile],
+  );
+
   const handleClearData = () => {
     clearCsvData();
     setUploadSuccess(null);
     setUploadError(null);
   };
 
-  const internalCohortData = getInternalCohortStreams();
+  const handleBrowseClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const internalCohortData = getInternalCohortStreams(startDate, endDate);
 
   return (
     <div className={`space-y-6 ${className}`}>
@@ -93,12 +202,56 @@ export const CsvUpload = ({ className = "" }: CsvUploadProps) => {
           <h2 className="card-title">📁 Upload CSV File</h2>
           <p className="text-sm opacity-70">Upload your accounting software CSV file with transaction data</p>
 
+          {/* Drag and Drop Zone */}
+          <div
+            className={`
+              border-2 border-dashed rounded-lg p-8 text-center transition-all duration-200 cursor-pointer
+              ${isDragOver ? "border-primary bg-primary/5 scale-105" : "border-gray-300 hover:border-primary"}
+              ${isUploading ? "opacity-50 cursor-not-allowed" : ""}
+            `}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            onClick={!isUploading ? handleBrowseClick : undefined}
+          >
+            <div className="space-y-4">
+              <div className="text-6xl">{isDragOver ? "⬇️" : isUploading ? "⏳" : "📄"}</div>
+              <div>
+                {isUploading ? (
+                  <div className="space-y-2">
+                    <div className="font-semibold">Processing CSV file...</div>
+                    <div className="flex justify-center">
+                      <span className="loading loading-spinner loading-md"></span>
+                    </div>
+                  </div>
+                ) : isDragOver ? (
+                  <div className="font-semibold text-primary">Drop your CSV file here!</div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="font-semibold">Drag & drop your CSV file here</div>
+                    <div className="text-sm opacity-70">or click to browse</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Hidden File Input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv"
+            className="hidden"
+            onChange={handleFileUpload}
+            disabled={isUploading}
+          />
+
+          {/* Alternative File Input (for accessibility) */}
           <div className="form-control w-full">
             <label className="label">
-              <span className="label-text">Select CSV File</span>
+              <span className="label-text">Or select CSV file manually</span>
             </label>
             <input
-              ref={fileInputRef}
               type="file"
               accept=".csv"
               className="file-input file-input-bordered w-full"
@@ -106,13 +259,6 @@ export const CsvUpload = ({ className = "" }: CsvUploadProps) => {
               disabled={isUploading}
             />
           </div>
-
-          {isUploading && (
-            <div className="flex items-center gap-2 mt-4">
-              <span className="loading loading-spinner loading-sm"></span>
-              <span>Processing CSV file...</span>
-            </div>
-          )}
 
           {uploadError && (
             <div className="alert alert-error mt-4">
@@ -175,10 +321,10 @@ export const CsvUpload = ({ className = "" }: CsvUploadProps) => {
               <table className="table table-xs">
                 <thead>
                   <tr>
-                    <th>ETH Out</th>
-                    <th>FIAT Out</th>
-                    <th>To</th>
-                    <th>From</th>
+                    <th>Token Amount Out</th>
+                    <th>Fiat Value Out</th>
+                    <th>To Wallet</th>
+                    <th>From Wallet</th>
                     <th>Account</th>
                   </tr>
                 </thead>

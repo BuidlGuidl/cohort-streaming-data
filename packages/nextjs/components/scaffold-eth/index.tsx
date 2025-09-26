@@ -2,6 +2,8 @@ export * from "./AccountingData";
 export * from "./Address/Address";
 export * from "./Balance";
 export * from "./BlockieAvatar";
+export * from "./DateRangeDropdown";
+export * from "./DateRangeSelector";
 export * from "./Faucet";
 export * from "./FaucetButton";
 export * from "./Input";

@@ -8,33 +8,20 @@ import {
   useCohortInformation,
   useCohortWithdrawals,
 } from "~~/hooks/ponder";
+import { useDateStore } from "~~/services/store/dateStore";
 
 interface BuilderStatsProps {
   className?: string;
 }
 
 export const BuilderStats = ({ className = "" }: BuilderStatsProps) => {
-  // Date range state (default to last 3 months)
-  const [startDate, setStartDate] = useState(() => {
-    const date = new Date();
-    date.setMonth(date.getMonth() - 3);
-    return date.toISOString().split("T")[0];
-  });
-
-  const [endDate, setEndDate] = useState(() => {
-    const date = new Date();
-    return date.toISOString().split("T")[0];
-  });
+  // Use shared date store
+  const { startDate, endDate } = useDateStore();
 
   // Fetch data
   const { data: cohortInfo, isLoading: isLoadingCohorts } = useCohortInformation();
   const { data: buildersData, isLoading: isLoadingBuilders } = useCohortBuilders();
-  const {
-    data: withdrawalsData,
-    isLoading: isLoadingWithdrawals,
-    error,
-    refetch,
-  } = useCohortWithdrawals(startDate, endDate);
+  const { data: withdrawalsData, isLoading: isLoadingWithdrawals, error } = useCohortWithdrawals(startDate, endDate);
 
   // Process data
   const { cohortNamesMap, builderStats } = useMemo(() => {
@@ -82,39 +69,6 @@ export const BuilderStats = ({ className = "" }: BuilderStatsProps) => {
           <p className="text-sm opacity-70">
             Withdraw statistics for BuidlGuidl cohort builders using pure Ponder data
           </p>
-
-          {/* Date Range Controls */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-            <div>
-              <label className="label">
-                <span className="label-text">Start Date</span>
-              </label>
-              <input
-                type="date"
-                className="input input-bordered w-full"
-                value={startDate}
-                onChange={e => setStartDate(e.target.value)}
-              />
-            </div>
-
-            <div>
-              <label className="label">
-                <span className="label-text">End Date</span>
-              </label>
-              <input
-                type="date"
-                className="input input-bordered w-full"
-                value={endDate}
-                onChange={e => setEndDate(e.target.value)}
-              />
-            </div>
-
-            <div className="flex items-end">
-              <button className="btn btn-primary w-full" onClick={() => refetch()} disabled={isLoading}>
-                {isLoading ? "Loading..." : "Fetch Data"}
-              </button>
-            </div>
-          </div>
 
           {/* Summary Stats */}
           {builderStats.length > 0 && (
@@ -208,7 +162,18 @@ const BuilderRow = ({ builder }: BuilderRowProps) => {
         onClick={() => setShowDetails(!showDetails)}
       >
         <td>
-          <div className="font-semibold">{builder.displayName}</div>
+          {builder.displayName === builder.address.slice(0, 6) + "..." + builder.address.slice(-4) ? (
+            // No ENS name - show only the full shortened address
+            <div className="font-semibold text-lg font-mono">{builder.displayName}</div>
+          ) : (
+            // Has ENS name - show ENS with address below
+            <>
+              <div className="font-semibold text-lg">{builder.displayName}</div>
+              <div className="text-xs opacity-70 font-mono">
+                {builder.address.slice(0, 6)}...{builder.address.slice(-4)}
+              </div>
+            </>
+          )}
         </td>
         <td className="text-center">
           <div className="font-mono font-bold text-lg">{builder.totalAmount.toFixed(4)} ETH</div>

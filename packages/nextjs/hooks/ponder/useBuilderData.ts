@@ -201,5 +201,16 @@ export const processBuilderWithdrawals = (
   );
 
   // Convert to array and sort by total amount (descending)
-  return Object.values(builderWithdraws).sort((a, b) => b.totalAmount - a.totalAmount);
+  const result = Object.values(builderWithdraws).sort((a, b) => b.totalAmount - a.totalAmount);
+
+  // Sort each builder's withdrawals by timestamp (newest first)
+  result.forEach(builder => {
+    builder.withdrawals.sort((a, b) => {
+      const timestampA = new Date(a.date.replace(/(\d{4})\/(\d{2})\/(\d{2})/, "$2/$3/$1")).getTime();
+      const timestampB = new Date(b.date.replace(/(\d{4})\/(\d{2})\/(\d{2})/, "$2/$3/$1")).getTime();
+      return timestampB - timestampA; // Newest first
+    });
+  });
+
+  return result;
 };
