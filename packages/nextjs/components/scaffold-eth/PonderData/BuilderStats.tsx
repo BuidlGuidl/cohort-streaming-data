@@ -235,7 +235,7 @@ const BuilderRow = ({ builder }: BuilderRowProps) => {
                         <span className="badge badge-info">{withdrawal.cohortDisplayName}</span>
                         <span className="badge badge-ghost text-xs">{withdrawal.date}</span>
                       </div>
-                      <div className="text-sm text-gray-600 italic">&quot;{withdrawal.reason}&quot;</div>
+                      <div className="text-sm text-base-content/70 italic">&quot;{withdrawal.reason}&quot;</div>
                     </div>
                   ))}
                 </div>
