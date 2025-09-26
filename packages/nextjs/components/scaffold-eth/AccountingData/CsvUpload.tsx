@@ -133,7 +133,7 @@ export const CsvUpload = ({ className = "", onUploadSuccess }: CsvUploadProps) =
         },
       });
     },
-    [setCsvData],
+    [setCsvData, onUploadSuccess],
   );
 
   const handleFileUpload = useCallback(
