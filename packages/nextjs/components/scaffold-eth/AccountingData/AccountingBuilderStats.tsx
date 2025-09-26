@@ -4,6 +4,20 @@ import { useMemo, useState } from "react";
 import { useCsvStore } from "~~/services/store/csvStore";
 import { useDateStore } from "~~/services/store/dateStore";
 
+// Utility function to format ETH amounts (remove leading zero for amounts < 1)
+const formatEthAmount = (amount: number): string => {
+  const formatted = amount.toFixed(2);
+  return formatted.startsWith("0.") ? formatted.substring(1) : formatted;
+};
+
+// Utility function to format FIAT amounts with commas
+const formatFiatAmount = (amount: number): string => {
+  return amount.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+};
+
 // Utility function to parse ENS name from Excel hyperlink formula
 // Example input: =hyperlink("https://optimistic.etherscan.io/address/0x45334f41aaa464528cd5bc0f582acadc49eb0cd1","oxrinat.eth streams")
 // Expected output: "oxrinat.eth"
@@ -56,6 +70,10 @@ const parseEnsFromHyperlink = (hyperlinkString: string): string => {
 
 interface AccountingBuilderStatsProps {
   className?: string;
+  fileName?: string | null;
+  csvDataLength?: number;
+  onUploadNewCsv?: () => void;
+  onClearData?: () => void;
 }
 
 interface AccountingBuilderData {
@@ -71,7 +89,13 @@ interface AccountingBuilderData {
   }>;
 }
 
-export const AccountingBuilderStats = ({ className = "" }: AccountingBuilderStatsProps) => {
+export const AccountingBuilderStats = ({
+  className = "",
+  fileName,
+  csvDataLength,
+  onUploadNewCsv,
+  onClearData,
+}: AccountingBuilderStatsProps) => {
   const { getInternalCohortStreams } = useCsvStore();
   const { startDate, endDate } = useDateStore();
   const internalCohortData = getInternalCohortStreams(startDate, endDate);
@@ -149,7 +173,6 @@ export const AccountingBuilderStats = ({ className = "" }: AccountingBuilderStat
   // Calculate summary stats
   const totalEthAmount = builderStats.reduce((sum, builder) => sum + builder.totalEthAmount, 0);
   const totalFiatAmount = builderStats.reduce((sum, builder) => sum + builder.totalFiatAmount, 0);
-  const totalWithdrawals = builderStats.reduce((sum, builder) => sum + builder.withdrawalCount, 0);
 
   if (internalCohortData.length === 0) {
     return (
@@ -169,43 +192,46 @@ export const AccountingBuilderStats = ({ className = "" }: AccountingBuilderStat
 
   return (
     <div className={`space-y-6 ${className}`}>
-      {/* Header */}
-      <div className="card bg-base-100 shadow-xl">
-        <div className="card-body">
-          <h2 className="card-title">👨‍💻 Accounting Builder Stats</h2>
-          <p className="text-sm opacity-70">
-            Builder withdrawal statistics from your accounting software CSV data (Internal Cohort Streams only)
-          </p>
-
-          {/* Summary Stats */}
-          <div className="stats shadow mt-4">
-            <div className="stat">
-              <div className="stat-title">Total Builders</div>
-              <div className="stat-value text-primary">{builderStats.length}</div>
-            </div>
-
-            <div className="stat">
-              <div className="stat-title">Total Withdrawals</div>
-              <div className="stat-value text-secondary">{totalWithdrawals}</div>
-            </div>
-
-            <div className="stat">
-              <div className="stat-title">Total ETH</div>
-              <div className="stat-value text-accent">{totalEthAmount.toFixed(4)} ETH</div>
-            </div>
-
-            <div className="stat">
-              <div className="stat-title">Total FIAT</div>
-              <div className="stat-value text-success">${totalFiatAmount.toFixed(2)}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Builder Stats Table */}
       <div className="card bg-base-100 shadow-xl">
         <div className="card-body">
-          <h3 className="card-title">Builder Rankings (by Total ETH Amount)</h3>
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-4">
+            <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+              <h3 className="card-title mb-0">
+                Accounting Cohort Data
+                <div className="flex gap-4 ml-4">
+                  <span className="badge badge-primary badge-lg">Total ETH: {formatEthAmount(totalEthAmount)}</span>
+                  <span className="badge badge-success badge-lg">Total FIAT: ${formatFiatAmount(totalFiatAmount)}</span>
+                </div>
+              </h3>
+            </div>
+
+            {/* CSV Controls */}
+            <div className="flex items-center gap-4 lg:flex-shrink-0">
+              {/* Current File Info */}
+              <div className="bg-success/10 border border-success/30 rounded px-3 py-2">
+                <div className="text-xs font-semibold text-success">
+                  📊 {fileName && fileName.length > 30 ? fileName.substring(0, 30) + "..." : fileName || "Unknown file"}
+                </div>
+                <div className="text-xs opacity-70">{csvDataLength} transactions</div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-2">
+                <button
+                  className="btn btn-sm border-success text-success hover:bg-success hover:text-success-content"
+                  onClick={onUploadNewCsv}
+                >
+                  <span className="mr-1">📁</span>
+                  Upload New CSV
+                </button>
+                <button className="btn btn-error btn-outline btn-sm" onClick={onClearData}>
+                  <span className="mr-1">🗑️</span>
+                  Clear Data
+                </button>
+              </div>
+            </div>
+          </div>
 
           <div className="overflow-x-auto">
             <table className="table">
@@ -259,10 +285,10 @@ const AccountingBuilderRow = ({ builder }: AccountingBuilderRowProps) => {
           )}
         </td>
         <td className="text-center">
-          <div className="font-mono font-bold text-lg">{builder.totalEthAmount.toFixed(4)} ETH</div>
+          <div className="font-mono font-bold text-lg">{formatEthAmount(builder.totalEthAmount)} ETH</div>
         </td>
         <td className="text-center">
-          <div className="font-mono font-bold text-lg">${builder.totalFiatAmount.toFixed(2)}</div>
+          <div className="font-mono font-bold text-lg">${formatFiatAmount(builder.totalFiatAmount)}</div>
         </td>
         <td className="text-center">
           <span className="badge badge-primary">{builder.withdrawalCount}</span>
@@ -291,10 +317,10 @@ const AccountingBuilderRow = ({ builder }: AccountingBuilderRowProps) => {
                       <div key={idx} className="bg-base-100 p-3 rounded-lg border border-base-300 shadow-sm">
                         <div className="flex flex-wrap items-center gap-2 mb-2">
                           <span className="badge badge-success font-mono font-bold">
-                            {withdrawal.ethAmount.toFixed(4)} ETH
+                            {formatEthAmount(withdrawal.ethAmount)} ETH
                           </span>
                           <span className="badge badge-info font-mono font-bold">
-                            ${withdrawal.fiatAmount.toFixed(2)}
+                            ${formatFiatAmount(withdrawal.fiatAmount)}
                           </span>
                           <span className="badge badge-ghost text-xs">{formattedDate}</span>
                         </div>

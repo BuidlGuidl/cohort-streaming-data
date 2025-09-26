@@ -6,7 +6,7 @@ import { AccountingBuilderStats, CsvUpload } from "~~/components/scaffold-eth/Ac
 import { useCsvStore } from "~~/services/store/csvStore";
 
 const AccountingData: NextPage = () => {
-  const { csvData, fileName, uploadedAt, clearCsvData } = useCsvStore();
+  const { csvData, fileName, clearCsvData } = useCsvStore();
   const [showUploadModal, setShowUploadModal] = useState(false);
   const hasData = csvData.length > 0;
 
@@ -21,50 +21,6 @@ const AccountingData: NextPage = () => {
 
   return (
     <div className="container mx-auto p-4 space-y-6">
-      {/* Header */}
-      <div className="text-center">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <div className="lg:text-left">
-            <h1 className="text-4xl font-bold mb-2">🧮 Accounting Data</h1>
-            <p className="text-lg opacity-80 max-w-2xl">
-              {hasData
-                ? "View builder statistics from your uploaded CSV data. Compare with Ponder data for accuracy verification."
-                : "Upload CSV data from your accounting software and view builder statistics. Compare with Ponder data for accuracy verification."}
-            </p>
-          </div>
-
-          {hasData && (
-            <div className="flex flex-col gap-3 lg:flex-shrink-0">
-              {/* Current File Info */}
-              <div className="bg-success/10 border border-success/30 rounded-lg p-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-sm font-semibold text-success">📊 Current CSV File</div>
-                    <div className="text-sm font-medium">{fileName}</div>
-                    <div className="text-xs opacity-70">
-                      {uploadedAt ? new Date(uploadedAt).toLocaleString() : "Unknown upload time"} • {csvData.length}{" "}
-                      transactions
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row gap-2">
-                <button className="btn btn-primary btn-outline" onClick={handleUploadNewCsv}>
-                  <span className="mr-2">📁</span>
-                  Upload New CSV
-                </button>
-                <button className="btn btn-error btn-outline btn-sm" onClick={handleClearData}>
-                  <span className="mr-1">🗑️</span>
-                  Clear Data
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
       {/* Conditional Content */}
       {!hasData ? (
         <>
@@ -107,7 +63,13 @@ const AccountingData: NextPage = () => {
       ) : (
         <>
           {/* Builder Stats Section - Now has more space */}
-          <AccountingBuilderStats className="w-full" />
+          <AccountingBuilderStats
+            className="w-full"
+            fileName={fileName}
+            csvDataLength={csvData.length}
+            onUploadNewCsv={handleUploadNewCsv}
+            onClearData={handleClearData}
+          />
         </>
       )}
 

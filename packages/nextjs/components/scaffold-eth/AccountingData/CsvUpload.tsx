@@ -5,6 +5,20 @@ import Papa from "papaparse";
 import { type CsvTransaction, useCsvStore } from "~~/services/store/csvStore";
 import { useDateStore } from "~~/services/store/dateStore";
 
+// Utility function to format ETH amounts (remove leading zero for amounts < 1)
+const formatEthAmount = (amount: number): string => {
+  const formatted = amount.toFixed(2);
+  return formatted.startsWith("0.") ? formatted.substring(1) : formatted;
+};
+
+// Utility function to format FIAT amounts with commas
+const formatFiatAmount = (amount: number): string => {
+  return amount.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+};
+
 interface CsvUploadProps {
   className?: string;
   onUploadSuccess?: () => void;
@@ -331,8 +345,8 @@ export const CsvUpload = ({ className = "", onUploadSuccess }: CsvUploadProps) =
                 <tbody>
                   {internalCohortData.slice(0, 5).map((transaction, index) => (
                     <tr key={index}>
-                      <td className="font-mono">{transaction.ethOut.toFixed(4)}</td>
-                      <td className="font-mono">${transaction.fiatOut.toFixed(2)}</td>
+                      <td className="font-mono">{formatEthAmount(transaction.ethOut)}</td>
+                      <td className="font-mono">${formatFiatAmount(transaction.fiatOut)}</td>
                       <td className="font-mono text-xs">{transaction.to}</td>
                       <td className="font-mono text-xs">{transaction.from}</td>
                       <td className="text-xs">{transaction.account}</td>

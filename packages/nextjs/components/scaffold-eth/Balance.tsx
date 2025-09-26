@@ -6,6 +6,20 @@ import { useTargetNetwork } from "~~/hooks/scaffold-eth/useTargetNetwork";
 import { useWatchBalance } from "~~/hooks/scaffold-eth/useWatchBalance";
 import { useGlobalState } from "~~/services/store/store";
 
+// Utility function to format ETH amounts (remove leading zero for amounts < 1)
+const formatEthAmount = (amount: number): string => {
+  const formatted = amount.toFixed(2);
+  return formatted.startsWith("0.") ? formatted.substring(1) : formatted;
+};
+
+// Utility function to format USD amounts with commas
+const formatUsdAmount = (amount: number): string => {
+  return amount.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+};
+
 type BalanceProps = {
   address?: Address;
   className?: string;
@@ -61,11 +75,11 @@ export const Balance = ({ address, className = "", usdMode }: BalanceProps) => {
         {displayUsdMode ? (
           <>
             <span className="text-[0.8em] font-bold mr-1">$</span>
-            <span>{(formattedBalance * nativeCurrencyPrice).toFixed(2)}</span>
+            <span>{formatUsdAmount(formattedBalance * nativeCurrencyPrice)}</span>
           </>
         ) : (
           <>
-            <span>{formattedBalance.toFixed(4)}</span>
+            <span>{formatEthAmount(formattedBalance)}</span>
             <span className="text-[0.8em] font-bold ml-1">{targetNetwork.nativeCurrency.symbol}</span>
           </>
         )}

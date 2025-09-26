@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useDateStore } from "~~/services/store/dateStore";
 
 export const DateRangeDropdown = () => {
@@ -8,6 +8,7 @@ export const DateRangeDropdown = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [customStartDate, setCustomStartDate] = useState(startDate);
   const [customEndDate, setCustomEndDate] = useState(endDate);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const presets = [
     { id: "1m", label: "1 Month" },
@@ -37,180 +38,162 @@ export const DateRangeDropdown = () => {
     setIsModalOpen(false);
   };
 
-  const openModal = () => {
-    setCustomStartDate(startDate);
-    setCustomEndDate(endDate);
-    setIsModalOpen(true);
+  const toggleModal = () => {
+    if (isModalOpen) {
+      setIsModalOpen(false);
+    } else {
+      setCustomStartDate(startDate);
+      setCustomEndDate(endDate);
+      setIsModalOpen(true);
+    }
   };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsModalOpen(false);
+      }
+    };
+
+    if (isModalOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isModalOpen]);
 
   return (
     <>
-      {/* Dropdown Button */}
-      <div className="dropdown dropdown-end">
+      {/* Professional Date Range Selector */}
+      <div className="relative" ref={dropdownRef}>
         <button
-          className="btn btn-outline btn-primary normal-case font-semibold text-base px-6 py-3 h-auto min-h-0"
-          onClick={openModal}
+          className="group flex items-center gap-3 px-4 py-3 bg-base-100 hover:bg-base-200 border border-base-300 hover:border-primary/50 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+          onClick={toggleModal}
         >
-          <span className="text-xl mr-2">📅</span>
-          <div className="flex flex-col items-start">
-            <span className="text-xs opacity-70">Date Range</span>
-            <span className="text-sm font-bold">{getCurrentLabel()}</span>
+          {/* Calendar Icon */}
+          <div className="flex-shrink-0 w-5 h-5 text-primary group-hover:text-primary/80 transition-colors">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-full h-full">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+              />
+            </svg>
           </div>
-          <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </button>
-      </div>
 
-      {/* Modal */}
-      {isModalOpen && (
-        <>
-          <div className="modal modal-open">
-            <div className="modal-box max-w-2xl p-0 bg-gradient-to-br from-base-100 to-base-200 shadow-2xl border-0">
-              {/* Header */}
-              <div className="bg-gradient-to-r from-primary to-secondary text-primary-content p-6 rounded-t-lg">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="text-3xl">📅</div>
-                    <div>
-                      <h3 className="text-2xl font-bold">Select Date Range</h3>
-                      <p className="text-sm opacity-90">Choose your data analysis period</p>
-                    </div>
-                  </div>
+          {/* Content */}
+          <div className="flex flex-col items-start min-w-0">
+            <span className="text-xs font-medium text-base-content/60 uppercase tracking-wide">Date Range</span>
+            <span className="text-sm font-semibold text-base-content truncate">{getCurrentLabel()}</span>
+          </div>
+
+          {/* Dropdown Arrow */}
+          <div className="flex-shrink-0 w-4 h-4 text-base-content/40 group-hover:text-base-content/60 transition-colors">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-full h-full">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
+        </button>
+
+        {/* Dropdown Menu */}
+        {isModalOpen && (
+          <div className="absolute top-full right-0 mt-2 w-96 max-w-[calc(100vw-2rem)] bg-base-100 border border-base-300 rounded-lg shadow-xl z-50">
+            <div className="p-6 space-y-6">
+              {/* Current Selection Display */}
+              <div className="bg-base-200 border border-base-300 rounded-lg p-4">
+                <div className="text-sm font-medium text-base-content/60 uppercase tracking-wide mb-2">
+                  Current Selection (
+                  {Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24))}{" "}
+                  Days)
+                </div>
+                <div className="text-lg font-semibold text-base-content">
+                  {new Date(startDate).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                  <span className="mx-2 text-base-content/50">→</span>
+                  {new Date(endDate).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                </div>
+              </div>
+
+              {/* Quick Presets */}
+              <div>
+                <h4 className="text-lg font-semibold mb-4 text-base-content">Quick Select</h4>
+                <div className="grid grid-cols-3 gap-3">
+                  {presets.slice(0, 6).map(preset => (
+                    <button
+                      key={preset.id}
+                      className={`group relative rounded-lg p-4 text-center transition-all duration-200 border ${
+                        currentPreset === preset.id
+                          ? "bg-primary text-primary-content border-primary shadow-md"
+                          : "bg-base-100 hover:bg-base-200 border-base-300 hover:border-primary/50"
+                      }`}
+                      onClick={() => handlePresetSelect(preset.id)}
+                    >
+                      <div className="text-sm font-semibold">{preset.label}</div>
+                    </button>
+                  ))}
+                  {/* Year 2025 spans full width */}
                   <button
-                    className="btn btn-ghost btn-circle text-white hover:bg-white/20"
-                    onClick={() => setIsModalOpen(false)}
+                    className={`group relative rounded-lg p-4 text-center transition-all duration-200 border col-span-3 ${
+                      currentPreset === "2025"
+                        ? "bg-accent text-accent-content border-accent shadow-md"
+                        : "bg-base-100 hover:bg-base-200 border-base-300 hover:border-accent/50"
+                    }`}
+                    onClick={() => handlePresetSelect("2025")}
                   >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
+                    <div className="text-lg font-semibold">2025</div>
                   </button>
                 </div>
               </div>
 
-              <div className="p-6 space-y-6">
-                {/* Current Selection Display */}
-                <div className="bg-gradient-to-r from-success/10 to-info/10 border border-success/30 rounded-xl p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-sm font-medium text-success">📊 CURRENT SELECTION</div>
-                      <div className="text-xl font-bold mt-1">
-                        {new Date(startDate).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })}
-                        <span className="mx-2 text-base-content/50">→</span>
-                        {new Date(endDate).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })}
-                      </div>
+              {/* Custom Range */}
+              <div>
+                <h4 className="text-lg font-semibold mb-4 text-base-content">Custom Range</h4>
+                <div className="bg-base-200 p-5 rounded-lg border border-base-300">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-base-content">Start Date</label>
+                      <input
+                        type="date"
+                        className="input input-bordered w-full bg-base-100 focus:border-primary focus:ring-2 focus:ring-primary/20"
+                        value={customStartDate}
+                        onChange={e => setCustomStartDate(e.target.value)}
+                      />
                     </div>
-                    <div className="text-right">
-                      <div className="text-sm text-base-content/70">Days</div>
-                      <div className="text-2xl font-bold text-info">
-                        {Math.ceil(
-                          (new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24),
-                        )}
-                      </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-base-content">End Date</label>
+                      <input
+                        type="date"
+                        className="input input-bordered w-full bg-base-100 focus:border-primary focus:ring-2 focus:ring-primary/20"
+                        value={customEndDate}
+                        onChange={e => setCustomEndDate(e.target.value)}
+                        min={customStartDate}
+                      />
                     </div>
                   </div>
-                </div>
-
-                {/* Quick Presets */}
-                <div>
-                  <h4 className="text-lg font-bold mb-4 flex items-center">
-                    <span className="mr-2">⚡</span>
-                    Quick Select
-                  </h4>
-                  <div className="grid grid-cols-3 gap-3">
-                    {presets.slice(0, 6).map(preset => (
-                      <button
-                        key={preset.id}
-                        className={`group relative overflow-hidden rounded-xl p-4 text-center transition-all duration-200 transform hover:scale-105 ${
-                          currentPreset === preset.id
-                            ? "bg-gradient-to-r from-primary to-secondary text-primary-content shadow-lg"
-                            : "bg-base-200 hover:bg-base-300 border-2 border-transparent hover:border-primary/30"
-                        }`}
-                        onClick={() => handlePresetSelect(preset.id)}
-                      >
-                        <div className="relative z-10">
-                          <div className="text-lg font-bold">{preset.label}</div>
-                          <div className="text-xs opacity-70 mt-1">
-                            {preset.id === "2025" ? "Full Year" : "Last " + preset.label.toLowerCase()}
-                          </div>
-                        </div>
-                        {currentPreset === preset.id && (
-                          <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent"></div>
-                        )}
-                      </button>
-                    ))}
-                    {/* Year 2025 spans full width */}
-                    <button
-                      className={`group relative overflow-hidden rounded-xl p-4 text-center transition-all duration-200 transform hover:scale-105 col-span-3 ${
-                        currentPreset === "2025"
-                          ? "bg-gradient-to-r from-accent to-warning text-accent-content shadow-lg"
-                          : "bg-base-200 hover:bg-base-300 border-2 border-transparent hover:border-accent/30"
-                      }`}
-                      onClick={() => handlePresetSelect("2025")}
-                    >
-                      <div className="relative z-10">
-                        <div className="text-xl font-bold">🗓️ Year 2025</div>
-                        <div className="text-sm opacity-70 mt-1">Complete year analysis</div>
-                      </div>
-                      {currentPreset === "2025" && (
-                        <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent"></div>
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Custom Range */}
-                <div>
-                  <h4 className="text-lg font-bold mb-4 flex items-center">
-                    <span className="mr-2">🎯</span>
-                    Custom Range
-                  </h4>
-                  <div className="bg-gradient-to-br from-base-200 to-base-300 p-6 rounded-xl border border-base-300">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                      <div className="space-y-2">
-                        <label className="text-sm font-semibold text-base-content/80">🚀 Start Date</label>
-                        <input
-                          type="date"
-                          className="input input-bordered w-full bg-base-100 focus:border-primary focus:ring-2 focus:ring-primary/20"
-                          value={customStartDate}
-                          onChange={e => setCustomStartDate(e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-semibold text-base-content/80">🏁 End Date</label>
-                        <input
-                          type="date"
-                          className="input input-bordered w-full bg-base-100 focus:border-primary focus:ring-2 focus:ring-primary/20"
-                          value={customEndDate}
-                          onChange={e => setCustomEndDate(e.target.value)}
-                          min={customStartDate}
-                        />
-                      </div>
-                    </div>
-                    <button
-                      className="btn btn-primary w-full bg-gradient-to-r from-primary to-secondary border-0 shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
-                      onClick={handleCustomApply}
-                      disabled={!customStartDate || !customEndDate || customStartDate > customEndDate}
-                    >
-                      <span className="mr-2">✨</span>
-                      Apply Custom Range
-                    </button>
-                  </div>
+                  <button
+                    className="btn btn-primary w-full"
+                    onClick={handleCustomApply}
+                    disabled={!customStartDate || !customEndDate || customStartDate > customEndDate}
+                  >
+                    Apply Custom Range
+                  </button>
                 </div>
               </div>
             </div>
           </div>
-          <div className="modal-backdrop bg-black/60 backdrop-blur-sm" onClick={() => setIsModalOpen(false)}></div>
-        </>
-      )}
+        )}
+      </div>
     </>
   );
 };

@@ -10,6 +10,12 @@ import {
 } from "~~/hooks/ponder";
 import { useDateStore } from "~~/services/store/dateStore";
 
+// Utility function to format ETH amounts (remove leading zero for amounts < 1)
+const formatEthAmount = (amount: number): string => {
+  const formatted = amount.toFixed(2);
+  return formatted.startsWith("0.") ? formatted.substring(1) : formatted;
+};
+
 interface BuilderStatsProps {
   className?: string;
 }
@@ -58,40 +64,9 @@ export const BuilderStats = ({ className = "" }: BuilderStatsProps) => {
 
   // Calculate summary stats
   const totalAmount = builderStats.reduce((sum, builder) => sum + builder.totalAmount, 0);
-  const totalWithdrawals = builderStats.reduce((sum, builder) => sum + builder.withdrawalCount, 0);
 
   return (
     <div className={`space-y-6 ${className}`}>
-      {/* Header and Controls */}
-      <div className="card bg-base-100 shadow-xl">
-        <div className="card-body">
-          <h2 className="card-title">👨‍💻 Builder Withdrawal Stats</h2>
-          <p className="text-sm opacity-70">
-            Withdraw statistics for BuidlGuidl cohort builders using pure Ponder data
-          </p>
-
-          {/* Summary Stats */}
-          {builderStats.length > 0 && (
-            <div className="stats shadow mt-4">
-              <div className="stat">
-                <div className="stat-title">Total Builders</div>
-                <div className="stat-value text-primary">{builderStats.length}</div>
-              </div>
-
-              <div className="stat">
-                <div className="stat-title">Total Withdrawals</div>
-                <div className="stat-value text-secondary">{totalWithdrawals}</div>
-              </div>
-
-              <div className="stat">
-                <div className="stat-title">Total Amount</div>
-                <div className="stat-value text-accent">{totalAmount.toFixed(4)} ETH</div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
       {/* Error Display */}
       {error && (
         <div className="alert alert-error">
@@ -110,7 +85,10 @@ export const BuilderStats = ({ className = "" }: BuilderStatsProps) => {
       {builderStats.length > 0 && (
         <div className="card bg-base-100 shadow-xl">
           <div className="card-body">
-            <h3 className="card-title">Builder Rankings (by Total Amount)</h3>
+            <h3 className="card-title">
+              Ponder Cohort Data
+              <span className="badge badge-primary badge-lg ml-4">Total: {formatEthAmount(totalAmount)} ETH</span>
+            </h3>
 
             <div className="overflow-x-auto">
               <table className="table">
@@ -176,7 +154,7 @@ const BuilderRow = ({ builder }: BuilderRowProps) => {
           )}
         </td>
         <td className="text-center">
-          <div className="font-mono font-bold text-lg">{builder.totalAmount.toFixed(4)} ETH</div>
+          <div className="font-mono font-bold text-lg">{formatEthAmount(builder.totalAmount)} ETH</div>
         </td>
         <td className="text-center">
           <span className="badge badge-primary">{builder.withdrawalCount}</span>
