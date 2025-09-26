@@ -142,7 +142,7 @@ export const CsvUpload = ({ className = "", onUploadSuccess }: CsvUploadProps) =
       if (!file) return;
       processFile(file);
     },
-    [processFile, onUploadSuccess],
+    [processFile],
   );
 
   // Drag and drop handlers
