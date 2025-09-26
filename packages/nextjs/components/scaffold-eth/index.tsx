@@ -1,3 +1,4 @@
+export * from "./AccountingData";
 export * from "./Address/Address";
 export * from "./Balance";
 export * from "./BlockieAvatar";

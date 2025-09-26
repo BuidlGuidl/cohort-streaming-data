@@ -3555,6 +3555,7 @@ __metadata:
     "@tanstack/react-query": ~5.59.15
     "@trivago/prettier-plugin-sort-imports": ~4.3.0
     "@types/node": ~18.19.50
+    "@types/papaparse": ^5.3.16
     "@types/react": ~19.0.7
     "@uniswap/sdk-core": ~5.8.2
     "@uniswap/v2-sdk": ~4.6.1
@@ -3574,6 +3575,7 @@ __metadata:
     next: ~15.2.3
     next-nprogress-bar: ~2.3.13
     next-themes: ~0.3.0
+    papaparse: ^5.5.3
     postcss: ~8.4.45
     prettier: ~3.5.3
     qrcode.react: ~4.0.1
@@ -4300,6 +4302,15 @@ __metadata:
   dependencies:
     undici-types: ~5.26.4
   checksum: aefbe13a03a40749bafd45f70bccd1f9816f7a79a25f06f23e87786f90b0cc2b865a6779993b1b5e2333c689c612e2579dc4c683ef7d5b6f16255a8c759ea564
+  languageName: node
+  linkType: hard
+
+"@types/papaparse@npm:^5.3.16":
+  version: 5.3.16
+  resolution: "@types/papaparse@npm:5.3.16"
+  dependencies:
+    "@types/node": "*"
+  checksum: 2e0ce0b8da264215eaba013645d4539292bb71e9cccc74004219d3e1b575bbbda9529264a7c1f1e6e19cba1fdbf4634021ed47f4126b11651f60c8573422d548
   languageName: node
   linkType: hard
 
@@ -13644,6 +13655,13 @@ __metadata:
   bin:
     pacote: bin/index.js
   checksum: 6fc395b579799da4bafa1d1b309df03a0b2540dfb29c312ee17e60afdec872d4da11398fc2be081184c0b73def935bb5ebf57b193623926ec2e502e4b98fe6ea
+  languageName: node
+  linkType: hard
+
+"papaparse@npm:^5.5.3":
+  version: 5.5.3
+  resolution: "papaparse@npm:5.5.3"
+  checksum: 369d68a16340e5fad95d411a0efca34bedbf93550744e6374fa9b60aaf6bc655e29a6d1a39a56afea0cf7dbc4454fd190f50a9ad76db80987b43d6c6c319f018
   languageName: node
   linkType: hard
 

@@ -21,6 +21,11 @@ export const menuLinks: HeaderMenuLink[] = [
     href: "/ponder-data",
     icon: <ChartBarIcon className="h-4 w-4" />,
   },
+  {
+    label: "Accounting Data",
+    href: "/accounting-data",
+    icon: <ChartBarIcon className="h-4 w-4" />,
+  },
 ];
 
 export const HeaderMenuLinks = () => {
