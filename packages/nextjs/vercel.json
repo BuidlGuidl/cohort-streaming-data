@@ -10,7 +10,4 @@
       "maxDuration": 10
     }
   },
-  "env": {
-    "VERCEL_BLOB_TOKEN": "@vercel_blob_token"
-  }
 }
