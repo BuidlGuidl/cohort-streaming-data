@@ -2,18 +2,29 @@
 
 import { useSharedCsvData } from "~~/hooks/useSharedCsvData";
 
-// Utility function to format ETH amounts (remove leading zero for amounts < 1)
-const formatEthAmount = (amount: number): string => {
-  const formatted = amount.toFixed(2);
-  return formatted.startsWith("0.") ? formatted.substring(1) : formatted;
-};
+// Utility function to get relative time (e.g., "2 hours ago", "3 days ago")
+const getRelativeTime = (date: Date): string => {
+  const now = new Date();
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
-// Utility function to format FIAT amounts with commas
-const formatFiatAmount = (amount: number): string => {
-  return amount.toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+  if (diffInSeconds < 60) {
+    return "just now";
+  } else if (diffInSeconds < 3600) {
+    const minutes = Math.floor(diffInSeconds / 60);
+    return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  } else if (diffInSeconds < 86400) {
+    const hours = Math.floor(diffInSeconds / 3600);
+    return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  } else if (diffInSeconds < 2592000) {
+    const days = Math.floor(diffInSeconds / 86400);
+    return `${days} day${days === 1 ? "" : "s"} ago`;
+  } else if (diffInSeconds < 31536000) {
+    const months = Math.floor(diffInSeconds / 2592000);
+    return `${months} month${months === 1 ? "" : "s"} ago`;
+  } else {
+    const years = Math.floor(diffInSeconds / 31536000);
+    return `${years} year${years === 1 ? "" : "s"} ago`;
+  }
 };
 
 interface SharedCsvDisplayProps {
@@ -21,20 +32,23 @@ interface SharedCsvDisplayProps {
 }
 
 export const SharedCsvDisplay = ({ className = "" }: SharedCsvDisplayProps) => {
-  const { data, loading, error, refetch, hasData, transactionCount, fileName, uploadedAt } = useSharedCsvData();
-
-  // Filter data based on date range if available
-  const filteredData = data?.data || [];
-  const internalCohortData = filteredData; // You can add date filtering logic here if needed
+  const { loading, error, refetch, hasData, transactionCount, fileName, uploadedAt } = useSharedCsvData();
 
   if (loading) {
     return (
-      <div className={`card bg-base-100 shadow-xl ${className}`}>
-        <div className="card-body">
-          <h2 className="card-title">📊 Shared CSV Data</h2>
-          <div className="flex items-center justify-center py-8">
-            <span className="loading loading-spinner loading-lg"></span>
-            <span className="ml-2">Loading shared data...</span>
+      <div className={`${className}`}>
+        {/* Compact Status Bar - Same height as normal state */}
+        <div className="bg-base-100 border border-base-300 rounded-lg p-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <span className="text-lg">📊</span>
+              <span className="font-medium">Shared Data:</span>
+              <span className="loading loading-spinner loading-xs"></span>
+              <span className="text-sm opacity-70">Loading...</span>
+            </div>
+            <button className="btn btn-xs btn-outline" onClick={refetch} disabled>
+              Refresh
+            </button>
           </div>
         </div>
       </div>
@@ -43,12 +57,16 @@ export const SharedCsvDisplay = ({ className = "" }: SharedCsvDisplayProps) => {
 
   if (error) {
     return (
-      <div className={`card bg-base-100 shadow-xl ${className}`}>
-        <div className="card-body">
-          <h2 className="card-title">📊 Shared CSV Data</h2>
-          <div className="alert alert-warning">
-            <span>{error}</span>
-            <button className="btn btn-sm btn-outline ml-2" onClick={refetch}>
+      <div className={`${className}`}>
+        {/* Compact Status Bar - Same height as normal state */}
+        <div className="bg-base-100 border border-base-300 rounded-lg p-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <span className="text-lg">📊</span>
+              <span className="font-medium">Shared Data:</span>
+              <span className="text-sm text-error">Error: {error}</span>
+            </div>
+            <button className="btn btn-xs btn-outline" onClick={refetch}>
               Retry
             </button>
           </div>
@@ -59,11 +77,18 @@ export const SharedCsvDisplay = ({ className = "" }: SharedCsvDisplayProps) => {
 
   if (!hasData) {
     return (
-      <div className={`card bg-base-100 shadow-xl ${className}`}>
-        <div className="card-body">
-          <h2 className="card-title">📊 Shared CSV Data</h2>
-          <div className="alert alert-info">
-            <span>No shared CSV data is currently available. An admin needs to upload data first.</span>
+      <div className={`${className}`}>
+        {/* Compact Status Bar - Same height as normal state */}
+        <div className="bg-base-100 border border-base-300 rounded-lg p-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <span className="text-lg">📊</span>
+              <span className="font-medium">Shared Data:</span>
+              <span className="text-sm opacity-70">No data available</span>
+            </div>
+            <button className="btn btn-xs btn-outline" onClick={refetch}>
+              Refresh
+            </button>
           </div>
         </div>
       </div>
@@ -71,80 +96,25 @@ export const SharedCsvDisplay = ({ className = "" }: SharedCsvDisplayProps) => {
   }
 
   return (
-    <div className={`space-y-6 ${className}`}>
-      {/* Data Status */}
-      <div className="card bg-base-100 shadow-xl">
-        <div className="card-body">
-          <div className="flex justify-between items-center">
-            <h2 className="card-title">📊 Shared CSV Data</h2>
-            <button className="btn btn-sm btn-outline" onClick={refetch}>
-              Refresh
-            </button>
+    <div className={`${className}`}>
+      {/* Compact Status Bar */}
+      <div className="bg-base-100 border border-base-300 rounded-lg p-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <span className="text-lg">📊</span>
+            <span className="font-medium">Shared Data:</span>
+            <span className="text-sm opacity-70">{fileName}</span>
+            <span className="text-primary font-semibold">({transactionCount} transactions)</span>
+            <span className="text-xs opacity-50">•</span>
+            <span className="text-xs opacity-70">
+              {uploadedAt ? `Uploaded ${getRelativeTime(new Date(uploadedAt))}` : "Unknown"}
+            </span>
           </div>
-
-          <div className="stats shadow">
-            <div className="stat">
-              <div className="stat-title">File Name</div>
-              <div className="stat-value text-sm">{fileName}</div>
-              <div className="stat-desc">
-                Uploaded: {uploadedAt ? new Date(uploadedAt).toLocaleString() : "Unknown"}
-              </div>
-            </div>
-
-            <div className="stat">
-              <div className="stat-title">Total Transactions</div>
-              <div className="stat-value text-primary">{transactionCount}</div>
-            </div>
-
-            <div className="stat">
-              <div className="stat-title">Internal Cohort Streams</div>
-              <div className="stat-value text-secondary">{internalCohortData.length}</div>
-              <div className="stat-desc">Available for analysis</div>
-            </div>
-          </div>
+          <button className="btn btn-xs btn-outline" onClick={refetch}>
+            Refresh
+          </button>
         </div>
       </div>
-
-      {/* Preview Section */}
-      {internalCohortData.length > 0 && (
-        <div className="card bg-base-100 shadow-xl">
-          <div className="card-body">
-            <h3 className="card-title">👀 Preview: Shared Transaction Data</h3>
-            <p className="text-sm opacity-70">Showing first 10 transactions from shared data</p>
-
-            <div className="overflow-x-auto">
-              <table className="table table-xs">
-                <thead>
-                  <tr>
-                    <th>Token Amount Out</th>
-                    <th>Fiat Value Out</th>
-                    <th>To Wallet</th>
-                    <th>From Wallet</th>
-                    <th>Account</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {internalCohortData.slice(0, 10).map((transaction, index) => (
-                    <tr key={index}>
-                      <td className="font-mono">{formatEthAmount(transaction.ethOut)}</td>
-                      <td className="font-mono">${formatFiatAmount(transaction.fiatOut)}</td>
-                      <td className="font-mono text-xs">{transaction.to}</td>
-                      <td className="font-mono text-xs">{transaction.from}</td>
-                      <td className="text-xs">{transaction.account}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {internalCohortData.length > 10 && (
-              <div className="text-center text-sm opacity-70 mt-2">
-                ... and {internalCohortData.length - 10} more transactions
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 };

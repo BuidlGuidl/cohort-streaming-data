@@ -25,6 +25,7 @@ export async function POST(request: NextRequest) {
     const blob = await put(`shared-csv-data.json`, JSON.stringify(jsonData, null, 2), {
       access: "public",
       contentType: "application/json",
+      allowOverwrite: true,
     });
 
     return NextResponse.json({
@@ -33,6 +34,7 @@ export async function POST(request: NextRequest) {
       downloadUrl: blob.downloadUrl,
       transactionCount: data.length,
       fileName,
+      blobUrl: blob.url, // Store the actual blob URL
     });
   } catch (error) {
     console.error("Error uploading CSV to Vercel Blobs:", error);

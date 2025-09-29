@@ -1,15 +1,23 @@
 import { NextResponse } from "next/server";
+import { list } from "@vercel/blob";
 
 export async function GET() {
   try {
-    // Try to fetch the shared data from Vercel Blobs
-    const response = await fetch(
-      `${
-        process.env.VERCEL_BLOB_READ_WRITE_TOKEN
-          ? `https://blob.vercel-storage.com/shared-csv-data.json`
-          : `https://public.blob.vercel-storage.com/shared-csv-data.json`
-      }`,
-    );
+    // List all blobs to find the shared CSV data
+    const { blobs } = await list();
+
+    // Find the shared-csv-data.json blob
+    const sharedDataBlob = blobs.find(blob => blob.pathname === "shared-csv-data.json");
+
+    if (!sharedDataBlob) {
+      return NextResponse.json({
+        exists: false,
+        message: "No shared data found",
+      });
+    }
+
+    // Fetch the blob data
+    const response = await fetch(sharedDataBlob.url);
 
     if (!response.ok) {
       return NextResponse.json({
