@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { NextPage } from "next";
 import { AccountingBuilderStats, CsvUpload } from "~~/components/scaffold-eth/AccountingData";
+import { SharedCsvDisplay } from "~~/components/scaffold-eth/SharedCsvDisplay";
 import { useCsvStore } from "~~/services/store/csvStore";
 
 const AccountingData: NextPage = () => {
@@ -21,6 +22,9 @@ const AccountingData: NextPage = () => {
 
   return (
     <div className="container mx-auto p-4 space-y-6">
+      {/* Shared CSV Data Display */}
+      <SharedCsvDisplay />
+
       {/* Conditional Content */}
       {!hasData ? (
         <>
