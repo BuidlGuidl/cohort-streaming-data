@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
       access: "public",
       contentType: "application/json",
       allowOverwrite: true,
+      token: process.env.VERCEL_BLOB_TOKEN,
     });
 
     return NextResponse.json({

@@ -4,7 +4,7 @@ import { list } from "@vercel/blob";
 export async function GET() {
   try {
     // List all blobs to find the shared CSV data
-    const { blobs } = await list();
+    const { blobs } = await list({ token: process.env.VERCEL_BLOB_TOKEN });
 
     // Find the shared-csv-data.json blob
     const sharedDataBlob = blobs.find(blob => blob.pathname === "shared-csv-data.json");
