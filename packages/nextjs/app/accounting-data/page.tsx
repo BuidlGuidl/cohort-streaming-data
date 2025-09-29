@@ -4,12 +4,15 @@ import { useState } from "react";
 import type { NextPage } from "next";
 import { AccountingBuilderStats, CsvUpload } from "~~/components/scaffold-eth/AccountingData";
 import { SharedCsvDisplay } from "~~/components/scaffold-eth/SharedCsvDisplay";
+import { useSharedCsvData } from "~~/hooks/useSharedCsvData";
 import { useCsvStore } from "~~/services/store/csvStore";
 
 const AccountingData: NextPage = () => {
   const { csvData, fileName, clearCsvData } = useCsvStore();
+  const { hasData: hasSharedData, fileName: sharedFileName, transactionCount } = useSharedCsvData();
   const [showUploadModal, setShowUploadModal] = useState(false);
   const hasData = csvData.length > 0;
+  const hasAnyData = hasData || hasSharedData;
 
   const handleUploadNewCsv = () => {
     setShowUploadModal(true);
@@ -26,7 +29,7 @@ const AccountingData: NextPage = () => {
       <SharedCsvDisplay />
 
       {/* Conditional Content */}
-      {!hasData ? (
+      {!hasAnyData ? (
         <>
           {/* CSV Upload Section */}
           <CsvUpload className="w-full" />
@@ -69,8 +72,8 @@ const AccountingData: NextPage = () => {
           {/* Builder Stats Section - Now has more space */}
           <AccountingBuilderStats
             className="w-full"
-            fileName={fileName}
-            csvDataLength={csvData.length}
+            fileName={hasData ? fileName : sharedFileName}
+            csvDataLength={hasData ? csvData.length : transactionCount}
             onUploadNewCsv={handleUploadNewCsv}
             onClearData={handleClearData}
           />

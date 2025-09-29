@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useSharedCsvData } from "~~/hooks/useSharedCsvData";
 import { useCsvStore } from "~~/services/store/csvStore";
 import { useDateStore } from "~~/services/store/dateStore";
 
@@ -98,7 +99,16 @@ export const AccountingBuilderStats = ({
 }: AccountingBuilderStatsProps) => {
   const { getInternalCohortStreams } = useCsvStore();
   const { startDate, endDate } = useDateStore();
-  const internalCohortData = getInternalCohortStreams(startDate, endDate);
+  const { data: sharedData } = useSharedCsvData();
+
+  // Get local data first, then fall back to shared data
+  const localInternalCohortData = getInternalCohortStreams(startDate, endDate);
+  const sharedInternalCohortData =
+    sharedData?.data?.filter(transaction => transaction.account?.toLowerCase().includes("internal cohort streams")) ||
+    [];
+
+  // Use local data if available, otherwise use shared data
+  const internalCohortData = localInternalCohortData.length > 0 ? localInternalCohortData : sharedInternalCohortData;
 
   // Process CSV data into builder stats
   const builderStats = useMemo(() => {
