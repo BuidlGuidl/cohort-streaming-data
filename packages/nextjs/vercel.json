@@ -9,5 +9,5 @@
     "app/api/shared-csv-data/route.ts": {
       "maxDuration": 10
     }
-  },
+  }
 }
