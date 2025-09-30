@@ -50,7 +50,7 @@ export const SharedCsvDisplay = ({ className = "", onUploadLocalCsv, onClearLoca
               <span className="text-lg">📊</span>
               <span className="font-medium">Data Source:</span>
               <span className="loading loading-spinner loading-xs"></span>
-              <span className="text-sm opacity-70">Loading shared data...</span>
+              <span className="text-sm opacity-70">Loading system data...</span>
             </div>
             <div className="flex items-center gap-2">
               <button className="btn btn-xs btn-outline" onClick={refetch} disabled>
@@ -68,45 +68,58 @@ export const SharedCsvDisplay = ({ className = "", onUploadLocalCsv, onClearLoca
     );
   }
 
-  // If we have local data, show that as the primary data source regardless of shared data status
+  // If we have shared data, prioritize it and hide local CSV controls
+  if (hasData) {
+    return (
+      <div className={`${className}`}>
+        <div className="bg-base-100 border border-base-300 rounded-lg p-4">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div className="flex items-center space-x-2">
+              <span className="text-lg">📊</span>
+              <span className="font-medium">Data Source:</span>
+              <span className="text-sm opacity-70">System: {fileName}</span>
+              <span className="text-primary font-semibold">({transactionCount} transactions)</span>
+              <span className="text-xs opacity-50">•</span>
+              <span className="text-xs opacity-70">
+                {uploadedAt ? `Uploaded ${getRelativeTime(new Date(uploadedAt))}` : "Unknown"}
+              </span>
+              <span className="badge badge-primary badge-sm">ACTIVE</span>
+            </div>
+
+            {/* Controls - only show refresh for shared data */}
+            <div className="flex items-center gap-2">
+              <button className="btn btn-xs btn-outline" onClick={refetch}>
+                Refresh
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // If we have local data but no shared data, show local data with controls
   if (hasLocalData) {
     return (
       <div className={`${className}`}>
         <div className="bg-base-100 border border-base-300 rounded-lg p-4">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-              {/* Active Local Data */}
-              <div className="flex items-center space-x-2">
-                <span className="text-lg">💾</span>
-                <span className="font-medium">Data Source:</span>
-                <span className="text-sm opacity-70">Local CSV: {localFileName}</span>
-                <span className="text-success font-semibold">({csvData.length} transactions)</span>
-                <span className="text-xs opacity-50">•</span>
-                <span className="text-xs opacity-70">
-                  {localUploadedAt ? `Uploaded ${getRelativeTime(localUploadedAt)}` : "Unknown"}
-                </span>
-                <span className="badge badge-success badge-sm">ACTIVE</span>
-              </div>
-
-              {/* Shared Data Status (if available) */}
-              {hasData && (
-                <div className="flex items-center space-x-2">
-                  <span className="text-lg">📊</span>
-                  <span className="font-medium">Shared:</span>
-                  <span className="text-sm opacity-70">{fileName}</span>
-                  <span className="text-primary font-semibold">({transactionCount} transactions)</span>
-                  <span className="text-xs opacity-50">•</span>
-                  <span className="text-xs opacity-70">
-                    {uploadedAt ? `Uploaded ${getRelativeTime(new Date(uploadedAt))}` : "Unknown"}
-                  </span>
-                </div>
-              )}
+            <div className="flex items-center space-x-2">
+              <span className="text-lg">💾</span>
+              <span className="font-medium">Data Source:</span>
+              <span className="text-sm opacity-70">Local CSV: {localFileName}</span>
+              <span className="text-success font-semibold">({csvData.length} transactions)</span>
+              <span className="text-xs opacity-50">•</span>
+              <span className="text-xs opacity-70">
+                {localUploadedAt ? `Uploaded ${getRelativeTime(localUploadedAt)}` : "Unknown"}
+              </span>
+              <span className="badge badge-success badge-sm">ACTIVE</span>
             </div>
 
-            {/* Controls */}
+            {/* Controls - show local CSV management */}
             <div className="flex items-center gap-2">
               <button className="btn btn-xs btn-outline" onClick={refetch}>
-                Refresh Shared
+                Refresh
               </button>
               {onUploadLocalCsv && (
                 <button className="btn btn-xs btn-success" onClick={onUploadLocalCsv}>
@@ -133,7 +146,7 @@ export const SharedCsvDisplay = ({ className = "", onUploadLocalCsv, onClearLoca
             <div className="flex items-center space-x-2">
               <span className="text-lg">📊</span>
               <span className="font-medium">Data Source:</span>
-              <span className="text-sm opacity-70">No shared CSV data available</span>
+              <span className="text-sm opacity-70">No system CSV data available</span>
             </div>
             <div className="flex items-center gap-2">
               <button className="btn btn-xs btn-outline" onClick={refetch}>
@@ -159,7 +172,7 @@ export const SharedCsvDisplay = ({ className = "", onUploadLocalCsv, onClearLoca
             <div className="flex items-center space-x-2">
               <span className="text-lg">📊</span>
               <span className="font-medium">Data Source:</span>
-              <span className="text-sm opacity-70">No shared CSV data available</span>
+              <span className="text-sm opacity-70">No system CSV data available</span>
             </div>
             <div className="flex items-center gap-2">
               <button className="btn btn-xs btn-outline" onClick={refetch}>
@@ -176,40 +189,4 @@ export const SharedCsvDisplay = ({ className = "", onUploadLocalCsv, onClearLoca
       </div>
     );
   }
-
-  // Only shared data available (no local data)
-  return (
-    <div className={`${className}`}>
-      <div className="bg-base-100 border border-base-300 rounded-lg p-4">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-            {/* Shared Data Status */}
-            <div className="flex items-center space-x-2">
-              <span className="text-lg">📊</span>
-              <span className="font-medium">Data Source:</span>
-              <span className="text-sm opacity-70">Shared: {fileName}</span>
-              <span className="text-primary font-semibold">({transactionCount} transactions)</span>
-              <span className="text-xs opacity-50">•</span>
-              <span className="text-xs opacity-70">
-                {uploadedAt ? `Uploaded ${getRelativeTime(new Date(uploadedAt))}` : "Unknown"}
-              </span>
-              <span className="badge badge-primary badge-sm">ACTIVE</span>
-            </div>
-          </div>
-
-          {/* Controls */}
-          <div className="flex items-center gap-2">
-            <button className="btn btn-xs btn-outline" onClick={refetch}>
-              Refresh
-            </button>
-            {onUploadLocalCsv && (
-              <button className="btn btn-xs btn-success" onClick={onUploadLocalCsv}>
-                📁 Upload Local CSV
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
 };
