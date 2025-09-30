@@ -93,9 +93,33 @@ export const AccountingBuilderStats = ({ className = "" }: AccountingBuilderStat
 
   // Get local data first, then fall back to shared data
   const localInternalCohortData = getInternalCohortStreams(startDate, endDate);
-  const sharedInternalCohortData =
-    sharedData?.data?.filter(transaction => transaction.account?.toLowerCase().includes("internal cohort streams")) ||
-    [];
+
+  // Filter shared data by date range and internal cohort streams
+  const sharedInternalCohortData = useMemo(() => {
+    if (!sharedData?.data) return [];
+
+    return sharedData.data.filter(transaction => {
+      // Filter for internal cohort streams
+      if (!transaction.account?.toLowerCase().includes("internal cohort streams")) {
+        return false;
+      }
+
+      // Apply date filtering if dates are provided
+      if (startDate || endDate) {
+        const dateField =
+          transaction["Date Time"] || transaction["date"] || transaction["Date"] || transaction["timestamp"];
+        if (!dateField) return true; // If no date field found, include the transaction
+
+        // Parse the date (assuming ISO format like "2025-09-23T05:48:23.000-06:00")
+        const transactionDate = new Date(dateField).toISOString().split("T")[0];
+
+        if (startDate && transactionDate < startDate) return false;
+        if (endDate && transactionDate > endDate) return false;
+      }
+
+      return true;
+    });
+  }, [sharedData?.data, startDate, endDate]);
 
   // Use local data if available, otherwise use shared data
   const internalCohortData = localInternalCohortData.length > 0 ? localInternalCohortData : sharedInternalCohortData;
