@@ -107,21 +107,29 @@ export const DateRangeDropdown = () => {
               <div className="bg-base-200 border border-base-300 rounded-lg p-4">
                 <div className="text-sm font-medium text-base-content/60 uppercase tracking-wide mb-2">
                   Current Selection (
-                  {Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24))}{" "}
+                  {Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1}{" "}
                   Days)
                 </div>
                 <div className="text-lg font-semibold text-base-content">
-                  {new Date(startDate).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
+                  {(() => {
+                    const [year, month, day] = startDate.split("-");
+                    const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                    return date.toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    });
+                  })()}
                   <span className="mx-2 text-base-content/50">→</span>
-                  {new Date(endDate).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
+                  {(() => {
+                    const [year, month, day] = endDate.split("-");
+                    const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                    return date.toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    });
+                  })()}
                 </div>
               </div>
 

@@ -88,7 +88,7 @@ export const BuilderStats = ({ className = "" }: BuilderStatsProps) => {
             <div className="flex flex-col gap-4">
               <h3 className="card-title mb-0">Ponder Cohort Data</h3>
               <div className="flex flex-wrap gap-2">
-                <span className="badge badge-primary badge-lg">Total: {formatEthAmount(totalAmount)} ETH</span>
+                <span className="badge badge-primary badge-lg">Total ETH: {formatEthAmount(totalAmount)}</span>
               </div>
             </div>
 
