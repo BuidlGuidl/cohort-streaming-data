@@ -71,10 +71,6 @@ const parseEnsFromHyperlink = (hyperlinkString: string): string => {
 
 interface AccountingBuilderStatsProps {
   className?: string;
-  fileName?: string | null;
-  csvDataLength?: number;
-  onUploadNewCsv?: () => void;
-  onClearData?: () => void;
 }
 
 interface AccountingBuilderData {
@@ -90,13 +86,7 @@ interface AccountingBuilderData {
   }>;
 }
 
-export const AccountingBuilderStats = ({
-  className = "",
-  fileName,
-  csvDataLength,
-  onUploadNewCsv,
-  onClearData,
-}: AccountingBuilderStatsProps) => {
+export const AccountingBuilderStats = ({ className = "" }: AccountingBuilderStatsProps) => {
   const { getInternalCohortStreams } = useCsvStore();
   const { startDate, endDate } = useDateStore();
   const { data: sharedData } = useSharedCsvData();
@@ -206,39 +196,11 @@ export const AccountingBuilderStats = ({
       <div className="card bg-base-100 shadow-xl">
         <div className="card-body">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-4">
-            <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-              <h3 className="card-title mb-0">
-                Accounting Cohort Data
-                <div className="flex gap-4 ml-4">
-                  <span className="badge badge-primary badge-lg">Total ETH: {formatEthAmount(totalEthAmount)}</span>
-                  <span className="badge badge-success badge-lg">Total FIAT: ${formatFiatAmount(totalFiatAmount)}</span>
-                </div>
-              </h3>
-            </div>
-
-            {/* CSV Controls */}
-            <div className="flex items-center gap-4 lg:flex-shrink-0">
-              {/* Current File Info */}
-              <div className="bg-success/10 border border-success/30 rounded px-3 py-2">
-                <div className="text-xs font-semibold text-success">
-                  📊 {fileName && fileName.length > 30 ? fileName.substring(0, 30) + "..." : fileName || "Unknown file"}
-                </div>
-                <div className="text-xs opacity-70">{csvDataLength} transactions</div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex gap-2">
-                <button
-                  className="btn btn-sm border-success text-success hover:bg-success hover:text-success-content"
-                  onClick={onUploadNewCsv}
-                >
-                  <span className="mr-1">📁</span>
-                  Upload New CSV
-                </button>
-                <button className="btn btn-error btn-outline btn-sm" onClick={onClearData}>
-                  <span className="mr-1">🗑️</span>
-                  Clear Data
-                </button>
+            <div className="flex flex-col gap-4">
+              <h3 className="card-title mb-0">Accounting Cohort Data</h3>
+              <div className="flex flex-wrap gap-2">
+                <span className="badge badge-primary badge-lg">Total ETH: {formatEthAmount(totalEthAmount)}</span>
+                <span className="badge badge-success badge-lg">Total FIAT: ${formatFiatAmount(totalFiatAmount)}</span>
               </div>
             </div>
           </div>

@@ -85,10 +85,12 @@ export const BuilderStats = ({ className = "" }: BuilderStatsProps) => {
       {builderStats.length > 0 && (
         <div className="card bg-base-100 shadow-xl">
           <div className="card-body">
-            <h3 className="card-title">
-              Ponder Cohort Data
-              <span className="badge badge-primary badge-lg ml-4">Total: {formatEthAmount(totalAmount)} ETH</span>
-            </h3>
+            <div className="flex flex-col gap-4">
+              <h3 className="card-title mb-0">Ponder Cohort Data</h3>
+              <div className="flex flex-wrap gap-2">
+                <span className="badge badge-primary badge-lg">Total: {formatEthAmount(totalAmount)} ETH</span>
+              </div>
+            </div>
 
             <div className="overflow-x-auto">
               <table className="table">

@@ -3,6 +3,12 @@ import { list } from "@vercel/blob";
 
 export async function GET() {
   try {
+    // Check if Vercel Blob token is available
+    if (!process.env.VERCEL_BLOB_TOKEN) {
+      console.log("No VERCEL_BLOB_TOKEN found, returning no data");
+      return NextResponse.json({ error: "No shared CSV data available" }, { status: 404 });
+    }
+
     // List all blobs to find the shared CSV data
     const { blobs } = await list({ token: process.env.VERCEL_BLOB_TOKEN });
 
@@ -31,6 +37,7 @@ export async function GET() {
     });
   } catch (error) {
     console.error("Error fetching shared CSV data:", error);
-    return NextResponse.json({ error: "Failed to fetch shared CSV data" }, { status: 500 });
+    // Return 404 instead of 500 for better UX
+    return NextResponse.json({ error: "No shared CSV data available" }, { status: 404 });
   }
 }

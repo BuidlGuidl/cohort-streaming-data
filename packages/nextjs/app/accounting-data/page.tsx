@@ -8,8 +8,8 @@ import { useSharedCsvData } from "~~/hooks/useSharedCsvData";
 import { useCsvStore } from "~~/services/store/csvStore";
 
 const AccountingData: NextPage = () => {
-  const { csvData, fileName, clearCsvData } = useCsvStore();
-  const { hasData: hasSharedData, fileName: sharedFileName, transactionCount } = useSharedCsvData();
+  const { csvData, clearCsvData } = useCsvStore();
+  const { hasData: hasSharedData } = useSharedCsvData();
   const [showUploadModal, setShowUploadModal] = useState(false);
   const hasData = csvData.length > 0;
   const hasAnyData = hasData || hasSharedData;
@@ -25,8 +25,8 @@ const AccountingData: NextPage = () => {
 
   return (
     <div className="container mx-auto p-4 space-y-6">
-      {/* Shared CSV Data Display */}
-      <SharedCsvDisplay />
+      {/* Shared CSV Data Display with Local CSV Controls */}
+      <SharedCsvDisplay onUploadLocalCsv={handleUploadNewCsv} onClearLocalData={handleClearData} />
 
       {/* Conditional Content */}
       {!hasAnyData ? (
@@ -48,35 +48,11 @@ const AccountingData: NextPage = () => {
               </ul>
             </div>
           </div>
-
-          {/* Info */}
-          <div className="card bg-base-100 shadow-xl">
-            <div className="card-body">
-              <h2 className="card-title">ℹ️ About Accounting Data</h2>
-              <div className="space-y-2">
-                <div className="text-sm opacity-70">
-                  This interface allows you to upload CSV data from your accounting software to compare with Ponder
-                  blockchain data. The CSV data persists while you navigate between Ponder Data and Accounting Data tabs
-                  for easy comparison.
-                </div>
-                <div className="text-sm opacity-70">
-                  Only transactions marked as &quot;Internal Cohort Streams&quot; will be displayed in the builder
-                  statistics.
-                </div>
-              </div>
-            </div>
-          </div>
         </>
       ) : (
         <>
           {/* Builder Stats Section - Now has more space */}
-          <AccountingBuilderStats
-            className="w-full"
-            fileName={hasData ? fileName : sharedFileName}
-            csvDataLength={hasData ? csvData.length : transactionCount}
-            onUploadNewCsv={handleUploadNewCsv}
-            onClearData={handleClearData}
-          />
+          <AccountingBuilderStats className="w-full" />
         </>
       )}
 

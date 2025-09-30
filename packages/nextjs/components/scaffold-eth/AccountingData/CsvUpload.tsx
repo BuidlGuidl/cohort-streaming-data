@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Papa from "papaparse";
 import { type CsvTransaction, useCsvStore } from "~~/services/store/csvStore";
 import { useDateStore } from "~~/services/store/dateStore";
@@ -29,10 +29,16 @@ export const CsvUpload = ({ className = "", onUploadSuccess }: CsvUploadProps) =
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [isClient, setIsClient] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { csvData, fileName, uploadedAt, setCsvData, clearCsvData, getInternalCohortStreams } = useCsvStore();
   const { startDate, endDate } = useDateStore();
+
+  // Prevent hydration issues by only rendering data-dependent content on client
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const processFile = useCallback(
     (file: File) => {
@@ -206,7 +212,7 @@ export const CsvUpload = ({ className = "", onUploadSuccess }: CsvUploadProps) =
     fileInputRef.current?.click();
   };
 
-  const internalCohortData = getInternalCohortStreams(startDate, endDate);
+  const internalCohortData = isClient ? getInternalCohortStreams(startDate, endDate) : [];
 
   return (
     <div className={`space-y-6 ${className}`}>
@@ -289,7 +295,7 @@ export const CsvUpload = ({ className = "", onUploadSuccess }: CsvUploadProps) =
       </div>
 
       {/* Current Data Status */}
-      {csvData.length > 0 && (
+      {isClient && csvData.length > 0 && (
         <div className="card bg-base-100 shadow-xl">
           <div className="card-body">
             <h3 className="card-title">📊 Current Data Status</h3>
@@ -325,7 +331,7 @@ export const CsvUpload = ({ className = "", onUploadSuccess }: CsvUploadProps) =
       )}
 
       {/* Preview Section */}
-      {internalCohortData.length > 0 && (
+      {isClient && internalCohortData.length > 0 && (
         <div className="card bg-base-100 shadow-xl">
           <div className="card-body">
             <h3 className="card-title">👀 Preview: Internal Cohort Streams</h3>
