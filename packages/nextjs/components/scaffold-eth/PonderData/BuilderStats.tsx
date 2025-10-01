@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   BuilderWithdrawStats,
   processBuilderWithdrawals,
@@ -11,7 +11,7 @@ import {
 import { useDateStore } from "~~/services/store/dateStore";
 import { useLlamaPayStore } from "~~/services/store/llamapayStore";
 
-type SortField = "name" | "eth" | "dai" | "withdrawals";
+type SortField = "name" | "eth" | "dai" | "fiat" | "withdrawals";
 type SortDirection = "asc" | "desc";
 
 // Utility function to format ETH amounts (remove leading zero for amounts < 1)
@@ -23,6 +23,11 @@ const formatEthAmount = (amount: number): string => {
 // Utility function to format DAI amounts
 const formatDaiAmount = (amount: number): string => {
   return Math.round(amount).toLocaleString("en-US");
+};
+
+// Utility function to format FIAT amounts
+const formatFiatAmount = (amount: number): string => {
+  return `$${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
 interface BuilderStatsProps {
@@ -41,8 +46,8 @@ export const BuilderStats = ({ className = "" }: BuilderStatsProps) => {
   const { data: buildersData, isLoading: isLoadingBuilders } = useCohortBuilders();
   const { data: withdrawalsData, isLoading: isLoadingWithdrawals, error } = useCohortWithdrawals(startDate, endDate);
 
-  // Process data
-  const { cohortNamesMap, builderStats } = useMemo(() => {
+  // Process data with async FIAT calculations
+  const { cohortNamesMap } = useMemo(() => {
     // Create cohort names mapping
     const cohortNamesMap =
       cohortInfo?.cohortInformations.items.reduce(
@@ -53,36 +58,72 @@ export const BuilderStats = ({ className = "" }: BuilderStatsProps) => {
         {} as Record<string, string>,
       ) || {};
 
-    // Create ENS names mapping
-    const ensNamesMap =
-      buildersData?.cohortBuilders.items.reduce(
-        (acc, builder) => {
-          if (builder.ens) {
-            acc[builder.address.toLowerCase()] = builder.ens;
-          }
-          return acc;
-        },
-        {} as Record<string, string>,
-      ) || {};
+    return { cohortNamesMap };
+  }, [cohortInfo, buildersData, withdrawalsData]);
 
-    // Process withdrawals
-    const withdrawals = withdrawalsData?.cohortWithdrawals.items || [];
-    const builderStats = processBuilderWithdrawals(withdrawals, cohortNamesMap, ensNamesMap);
+  // Handle async FIAT calculations
+  const [processedBuilderStats, setProcessedBuilderStats] = useState<BuilderWithdrawStats[]>([]);
+  const [isProcessingFiat, setIsProcessingFiat] = useState(false);
 
-    // Add LlamaPay data if enabled
-    if (includeLlamaPay) {
-      builderStats.forEach(builder => {
-        const llamapayDai = calculateLlamaPayForBuilder(builder.address, startDate, endDate);
-        (builder as any).llamapayDai = llamapayDai;
-      });
-    }
+  useEffect(() => {
+    const processData = async () => {
+      if (!withdrawalsData?.cohortWithdrawals.items || withdrawalsData.cohortWithdrawals.items.length === 0) {
+        setProcessedBuilderStats([]);
+        return;
+      }
 
-    return { cohortNamesMap, builderStats };
+      setIsProcessingFiat(true);
+
+      try {
+        // Create cohort names mapping
+        const cohortNamesMap =
+          cohortInfo?.cohortInformations.items.reduce(
+            (acc, cohort) => {
+              acc[cohort.address.toLowerCase()] = cohort.name;
+              return acc;
+            },
+            {} as Record<string, string>,
+          ) || {};
+
+        // Create ENS names mapping
+        const ensNamesMap =
+          buildersData?.cohortBuilders.items.reduce(
+            (acc, builder) => {
+              if (builder.ens) {
+                acc[builder.address.toLowerCase()] = builder.ens;
+              }
+              return acc;
+            },
+            {} as Record<string, string>,
+          ) || {};
+
+        // Process withdrawals with FIAT calculations
+        const withdrawals = withdrawalsData.cohortWithdrawals.items;
+        const builderStats = await processBuilderWithdrawals(withdrawals, cohortNamesMap, ensNamesMap);
+
+        // Add LlamaPay data if enabled
+        if (includeLlamaPay) {
+          builderStats.forEach(builder => {
+            const llamapayDai = calculateLlamaPayForBuilder(builder.address, startDate, endDate);
+            (builder as any).llamapayDai = llamapayDai;
+          });
+        }
+
+        setProcessedBuilderStats(builderStats);
+      } catch (error) {
+        console.error("Error processing FIAT calculations:", error);
+        setProcessedBuilderStats([]);
+      } finally {
+        setIsProcessingFiat(false);
+      }
+    };
+
+    processData();
   }, [cohortInfo, buildersData, withdrawalsData, includeLlamaPay, calculateLlamaPayForBuilder, startDate, endDate]);
 
   // Sort builder stats
   const sortedBuilderStats = useMemo(() => {
-    const sorted = [...builderStats].sort((a, b) => {
+    const sorted = [...processedBuilderStats].sort((a, b) => {
       let aValue: string | number;
       let bValue: string | number;
 
@@ -99,6 +140,10 @@ export const BuilderStats = ({ className = "" }: BuilderStatsProps) => {
           aValue = (a as any).llamapayDai || 0;
           bValue = (b as any).llamapayDai || 0;
           break;
+        case "fiat":
+          aValue = a.totalFiatAmount;
+          bValue = b.totalFiatAmount;
+          break;
         case "withdrawals":
           aValue = a.withdrawalCount;
           bValue = b.withdrawalCount;
@@ -113,12 +158,20 @@ export const BuilderStats = ({ className = "" }: BuilderStatsProps) => {
     });
 
     return sorted;
-  }, [builderStats, sortField, sortDirection]);
+  }, [processedBuilderStats, sortField, sortDirection]);
 
-  const isLoading = isLoadingCohorts || isLoadingBuilders || isLoadingWithdrawals;
+  const isLoading = isLoadingCohorts || isLoadingBuilders || isLoadingWithdrawals || isProcessingFiat;
 
   // Calculate summary stats
   const totalAmount = sortedBuilderStats.reduce((sum, builder) => sum + builder.totalAmount, 0);
+  const totalFiatAmount = sortedBuilderStats.reduce((sum, builder) => {
+    let builderFiat = builder.totalFiatAmount;
+    // Add LlamaPay DAI to FIAT total if enabled
+    if (includeLlamaPay && (builder as any).llamapayDai) {
+      builderFiat += (builder as any).llamapayDai;
+    }
+    return sum + builderFiat;
+  }, 0);
   const totalLlamaPayDai = includeLlamaPay
     ? sortedBuilderStats.reduce((sum, builder) => sum + ((builder as any).llamapayDai || 0), 0)
     : 0;
@@ -157,6 +210,7 @@ export const BuilderStats = ({ className = "" }: BuilderStatsProps) => {
               <h3 className="card-title mb-0">Ponder Cohort Data</h3>
               <div className="flex flex-wrap gap-2">
                 <span className="badge badge-primary badge-lg">Total ETH: {formatEthAmount(totalAmount)}</span>
+                <span className="badge badge-secondary badge-lg">Total FIAT: {formatFiatAmount(totalFiatAmount)}</span>
                 {includeLlamaPay && totalLlamaPayDai > 0 && (
                   <span className="badge badge-success badge-lg">Total DAI: {formatDaiAmount(totalLlamaPayDai)}</span>
                 )}
@@ -175,6 +229,12 @@ export const BuilderStats = ({ className = "" }: BuilderStatsProps) => {
                       onClick={() => handleSort("eth")}
                     >
                       Total ETH {sortField === "eth" && (sortDirection === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th
+                      className="text-center cursor-pointer hover:bg-base-200 select-none"
+                      onClick={() => handleSort("fiat")}
+                    >
+                      Total FIAT {sortField === "fiat" && (sortDirection === "asc" ? "↑" : "↓")}
                     </th>
                     {includeLlamaPay && (
                       <th
@@ -250,6 +310,11 @@ const BuilderRow = ({ builder }: BuilderRowProps) => {
         <td className="text-center">
           <div className="font-mono font-bold text-lg">{formatEthAmount(builder.totalAmount)}</div>
         </td>
+        <td className="text-center">
+          <div className="font-mono font-bold text-lg">
+            {formatFiatAmount(builder.totalFiatAmount + (includeLlamaPay ? (builder as any).llamapayDai || 0 : 0))}
+          </div>
+        </td>
         {includeLlamaPay && (
           <td className="text-center">
             {(builder as any).llamapayDai > 0 && (
@@ -266,7 +331,7 @@ const BuilderRow = ({ builder }: BuilderRowProps) => {
 
       {showDetails && (
         <tr>
-          <td colSpan={includeLlamaPay ? 4 : 3}>
+          <td colSpan={includeLlamaPay ? 5 : 4}>
             <div className="bg-base-200 p-4 rounded-lg border-2 border-primary/20 my-2">
               <h4 className="font-semibold mb-3 flex items-center">
                 <span className="mr-2">📋</span>
@@ -278,6 +343,9 @@ const BuilderRow = ({ builder }: BuilderRowProps) => {
                     <div key={idx} className="bg-base-100 p-3 rounded-lg border border-base-300 shadow-sm">
                       <div className="flex flex-wrap items-center gap-2 mb-2">
                         <span className="badge badge-success font-mono font-bold">{withdrawal.amount} ETH</span>
+                        <span className="badge badge-secondary font-mono font-bold">
+                          {formatFiatAmount(withdrawal.fiatAmount)}
+                        </span>
                         <span className="badge badge-info">{withdrawal.cohortDisplayName}</span>
                         <span className="badge badge-ghost text-xs">{withdrawal.date}</span>
                       </div>

@@ -1,4 +1,5 @@
 import { usePonderQuery } from "./usePonderQuery";
+import { ethPriceService } from "~~/services/ethPriceService";
 
 // GraphQL queries based on the script
 const COHORT_WITHDRAWALS_QUERY = `
@@ -87,9 +88,11 @@ export interface BuilderWithdrawStats {
   displayName: string;
   address: string;
   totalAmount: number;
+  totalFiatAmount: number;
   withdrawalCount: number;
   withdrawals: Array<{
     amount: string;
+    fiatAmount: number;
     cohortDisplayName: string;
     cohortContractAddress: string;
     reason: string;
@@ -162,12 +165,29 @@ export const getBuilderDisplayName = (builderAddress: string, ensNamesMap: Recor
   return `${builderAddress.slice(0, 6)}...${builderAddress.slice(-4)}`;
 };
 
-// Process withdrawals into builder stats
-export const processBuilderWithdrawals = (
+// Process withdrawals into builder stats with FIAT calculations
+export const processBuilderWithdrawals = async (
   withdrawals: CohortWithdrawal[],
   cohortNamesMap: Record<string, string>,
   ensNamesMap: Record<string, string>,
-): BuilderWithdrawStats[] => {
+): Promise<BuilderWithdrawStats[]> => {
+  // Get unique dates for price fetching
+  const uniqueDates = [
+    ...new Set(
+      withdrawals.map(event => {
+        const date = new Date(Number(event.timestamp) * 1000);
+        return date.toISOString().split("T")[0];
+      }),
+    ),
+  ];
+
+  // Fetch ETH prices for all unique dates
+  const ethPrices: { [dateKey: string]: number | null } = {};
+  for (const dateKey of uniqueDates) {
+    const date = new Date(dateKey);
+    ethPrices[dateKey] = await ethPriceService.getETHPrice(date);
+  }
+
   const builderWithdraws = withdrawals.reduce(
     (acc, event) => {
       const builderAddress = event.builder.toLowerCase();
@@ -177,6 +197,7 @@ export const processBuilderWithdrawals = (
           displayName: getBuilderDisplayName(event.builder, ensNamesMap),
           address: event.builder,
           totalAmount: 0,
+          totalFiatAmount: 0,
           withdrawalCount: 0,
           withdrawals: [],
         };
@@ -185,10 +206,18 @@ export const processBuilderWithdrawals = (
       const cohortDisplayName = getCohortDisplayName(event.cohortContractAddress, cohortNamesMap);
       const amount = parseFloat(event.amount);
 
+      // Calculate FIAT amount
+      const eventDate = new Date(Number(event.timestamp) * 1000);
+      const dateKey = eventDate.toISOString().split("T")[0];
+      const ethPrice = ethPrices[dateKey];
+      const fiatAmount = ethPrice ? amount * ethPrice : 0;
+
       acc[builderAddress].totalAmount += amount;
+      acc[builderAddress].totalFiatAmount += fiatAmount;
       acc[builderAddress].withdrawalCount += 1;
       acc[builderAddress].withdrawals.push({
         amount: event.amount,
+        fiatAmount,
         cohortDisplayName,
         cohortContractAddress: event.cohortContractAddress,
         reason: event.reason,
