@@ -63,7 +63,7 @@ const getDatePreset = (preset: string): DateRange => {
       return { startDate: oneYearAgo.toISOString().split("T")[0], endDate };
 
     case "2025":
-      return { startDate: "2025-01-01", endDate: "2025-12-31" };
+      return { startDate: "2025-01-01", endDate };
 
     default:
       // Default to last 3 months
