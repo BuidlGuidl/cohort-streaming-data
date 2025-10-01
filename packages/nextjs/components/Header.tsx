@@ -8,6 +8,7 @@ import { hardhat } from "viem/chains";
 import { Bars3Icon, ChartBarIcon } from "@heroicons/react/24/outline";
 import { DateRangeDropdown, FaucetButton, RainbowKitCustomConnectButton } from "~~/components/scaffold-eth";
 import { useOutsideClick, useTargetNetwork } from "~~/hooks/scaffold-eth";
+import { useLlamaPayStore } from "~~/services/store/llamapayStore";
 
 type HeaderMenuLink = {
   label: string;
@@ -60,6 +61,7 @@ export const HeaderMenuLinks = () => {
 export const Header = () => {
   const { targetNetwork } = useTargetNetwork();
   const isLocalNetwork = targetNetwork.id === hardhat.id;
+  const { includeLlamaPay, setIncludeLlamaPay } = useLlamaPayStore();
 
   const burgerMenuRef = useRef<HTMLDetailsElement>(null);
   useOutsideClick(burgerMenuRef, () => {
@@ -80,6 +82,16 @@ export const Header = () => {
             }}
           >
             <HeaderMenuLinks />
+            <li className="flex items-center justify-between p-2">
+              <span className="text-sm font-medium">Include LlamaPay</span>
+              <input
+                type="checkbox"
+                className="checkbox checkbox-sm"
+                checked={includeLlamaPay}
+                onChange={e => setIncludeLlamaPay(e.target.checked)}
+                onClick={e => e.stopPropagation()} // Prevent menu from closing when clicking checkbox
+              />
+            </li>
           </ul>
         </details>
         <Link href="/" passHref className="hidden lg:flex items-center gap-2 ml-4 mr-6 shrink-0">
@@ -93,6 +105,17 @@ export const Header = () => {
         </Link>
         <ul className="hidden lg:flex lg:flex-nowrap menu menu-horizontal px-1 gap-2">
           <HeaderMenuLinks />
+          <li className="flex items-center">
+            <label className="flex items-center gap-2 cursor-pointer px-3 py-1.5 text-sm rounded-full hover:bg-secondary hover:shadow-md transition-colors">
+              <input
+                type="checkbox"
+                className="checkbox checkbox-sm"
+                checked={includeLlamaPay}
+                onChange={e => setIncludeLlamaPay(e.target.checked)}
+              />
+              <span className="font-medium">Include LlamaPay</span>
+            </label>
+          </li>
         </ul>
       </div>
       <div className="navbar-end grow mr-4">

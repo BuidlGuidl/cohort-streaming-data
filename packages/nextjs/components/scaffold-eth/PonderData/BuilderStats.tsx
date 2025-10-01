@@ -9,11 +9,20 @@ import {
   useCohortWithdrawals,
 } from "~~/hooks/ponder";
 import { useDateStore } from "~~/services/store/dateStore";
+import { useLlamaPayStore } from "~~/services/store/llamapayStore";
+
+type SortField = "name" | "eth" | "dai" | "withdrawals";
+type SortDirection = "asc" | "desc";
 
 // Utility function to format ETH amounts (remove leading zero for amounts < 1)
 const formatEthAmount = (amount: number): string => {
   const formatted = amount.toFixed(2);
   return formatted.startsWith("0.") ? formatted.substring(1) : formatted;
+};
+
+// Utility function to format DAI amounts
+const formatDaiAmount = (amount: number): string => {
+  return Math.round(amount).toLocaleString("en-US");
 };
 
 interface BuilderStatsProps {
@@ -23,6 +32,9 @@ interface BuilderStatsProps {
 export const BuilderStats = ({ className = "" }: BuilderStatsProps) => {
   // Use shared date store
   const { startDate, endDate } = useDateStore();
+  const { includeLlamaPay, calculateLlamaPayForBuilder } = useLlamaPayStore();
+  const [sortField, setSortField] = useState<SortField>("eth");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
   // Fetch data
   const { data: cohortInfo, isLoading: isLoadingCohorts } = useCohortInformation();
@@ -57,13 +69,69 @@ export const BuilderStats = ({ className = "" }: BuilderStatsProps) => {
     const withdrawals = withdrawalsData?.cohortWithdrawals.items || [];
     const builderStats = processBuilderWithdrawals(withdrawals, cohortNamesMap, ensNamesMap);
 
+    // Add LlamaPay data if enabled
+    if (includeLlamaPay) {
+      builderStats.forEach(builder => {
+        const llamapayDai = calculateLlamaPayForBuilder(builder.address, startDate, endDate);
+        (builder as any).llamapayDai = llamapayDai;
+      });
+    }
+
     return { cohortNamesMap, builderStats };
-  }, [cohortInfo, buildersData, withdrawalsData]);
+  }, [cohortInfo, buildersData, withdrawalsData, includeLlamaPay, calculateLlamaPayForBuilder, startDate, endDate]);
+
+  // Sort builder stats
+  const sortedBuilderStats = useMemo(() => {
+    const sorted = [...builderStats].sort((a, b) => {
+      let aValue: string | number;
+      let bValue: string | number;
+
+      switch (sortField) {
+        case "name":
+          aValue = a.displayName.toLowerCase();
+          bValue = b.displayName.toLowerCase();
+          break;
+        case "eth":
+          aValue = a.totalAmount;
+          bValue = b.totalAmount;
+          break;
+        case "dai":
+          aValue = (a as any).llamapayDai || 0;
+          bValue = (b as any).llamapayDai || 0;
+          break;
+        case "withdrawals":
+          aValue = a.withdrawalCount;
+          bValue = b.withdrawalCount;
+          break;
+        default:
+          return 0;
+      }
+
+      if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    });
+
+    return sorted;
+  }, [builderStats, sortField, sortDirection]);
 
   const isLoading = isLoadingCohorts || isLoadingBuilders || isLoadingWithdrawals;
 
   // Calculate summary stats
-  const totalAmount = builderStats.reduce((sum, builder) => sum + builder.totalAmount, 0);
+  const totalAmount = sortedBuilderStats.reduce((sum, builder) => sum + builder.totalAmount, 0);
+  const totalLlamaPayDai = includeLlamaPay
+    ? sortedBuilderStats.reduce((sum, builder) => sum + ((builder as any).llamapayDai || 0), 0)
+    : 0;
+
+  // Handle sort
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDirection("desc");
+    }
+  };
 
   return (
     <div className={`space-y-6 ${className}`}>
@@ -82,13 +150,16 @@ export const BuilderStats = ({ className = "" }: BuilderStatsProps) => {
       )}
 
       {/* Builder Stats Table */}
-      {builderStats.length > 0 && (
+      {sortedBuilderStats.length > 0 && (
         <div className="card bg-base-100 shadow-xl">
           <div className="card-body">
             <div className="flex flex-col gap-4">
               <h3 className="card-title mb-0">Ponder Cohort Data</h3>
               <div className="flex flex-wrap gap-2">
                 <span className="badge badge-primary badge-lg">Total ETH: {formatEthAmount(totalAmount)}</span>
+                {includeLlamaPay && totalLlamaPayDai > 0 && (
+                  <span className="badge badge-success badge-lg">Total DAI: {formatDaiAmount(totalLlamaPayDai)}</span>
+                )}
               </div>
             </div>
 
@@ -96,13 +167,33 @@ export const BuilderStats = ({ className = "" }: BuilderStatsProps) => {
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Builder</th>
-                    <th className="text-center">Total Amount</th>
-                    <th className="text-center">Withdrawals</th>
+                    <th className="cursor-pointer hover:bg-base-200 select-none" onClick={() => handleSort("name")}>
+                      Builder {sortField === "name" && (sortDirection === "asc" ? "↑" : "↓")}
+                    </th>
+                    <th
+                      className="text-center cursor-pointer hover:bg-base-200 select-none"
+                      onClick={() => handleSort("eth")}
+                    >
+                      Total ETH {sortField === "eth" && (sortDirection === "asc" ? "↑" : "↓")}
+                    </th>
+                    {includeLlamaPay && (
+                      <th
+                        className="text-center cursor-pointer hover:bg-base-200 select-none"
+                        onClick={() => handleSort("dai")}
+                      >
+                        Total DAI {sortField === "dai" && (sortDirection === "asc" ? "↑" : "↓")}
+                      </th>
+                    )}
+                    <th
+                      className="text-center cursor-pointer hover:bg-base-200 select-none"
+                      onClick={() => handleSort("withdrawals")}
+                    >
+                      Withdrawals {sortField === "withdrawals" && (sortDirection === "asc" ? "↑" : "↓")}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {builderStats.map((builder, index) => (
+                  {sortedBuilderStats.map((builder, index) => (
                     <BuilderRow
                       key={builder.address}
                       builder={builder}
@@ -117,7 +208,7 @@ export const BuilderStats = ({ className = "" }: BuilderStatsProps) => {
         </div>
       )}
 
-      {builderStats.length === 0 && !isLoading && !error && (
+      {sortedBuilderStats.length === 0 && !isLoading && !error && (
         <div className="alert alert-info">
           <span>No withdrawals found for the selected date range</span>
         </div>
@@ -134,6 +225,7 @@ interface BuilderRowProps {
 
 const BuilderRow = ({ builder }: BuilderRowProps) => {
   const [showDetails, setShowDetails] = useState(false);
+  const { includeLlamaPay } = useLlamaPayStore();
 
   return (
     <>
@@ -156,8 +248,17 @@ const BuilderRow = ({ builder }: BuilderRowProps) => {
           )}
         </td>
         <td className="text-center">
-          <div className="font-mono font-bold text-lg">{formatEthAmount(builder.totalAmount)} ETH</div>
+          <div className="font-mono font-bold text-lg">{formatEthAmount(builder.totalAmount)}</div>
         </td>
+        {includeLlamaPay && (
+          <td className="text-center">
+            {(builder as any).llamapayDai > 0 && (
+              <div className="font-mono font-bold text-lg text-green-600">
+                {formatDaiAmount((builder as any).llamapayDai)}
+              </div>
+            )}
+          </td>
+        )}
         <td className="text-center">
           <span className="badge badge-primary">{builder.withdrawalCount}</span>
         </td>
@@ -165,7 +266,7 @@ const BuilderRow = ({ builder }: BuilderRowProps) => {
 
       {showDetails && (
         <tr>
-          <td colSpan={3}>
+          <td colSpan={includeLlamaPay ? 4 : 3}>
             <div className="bg-base-200 p-4 rounded-lg border-2 border-primary/20 my-2">
               <h4 className="font-semibold mb-3 flex items-center">
                 <span className="mr-2">📋</span>
