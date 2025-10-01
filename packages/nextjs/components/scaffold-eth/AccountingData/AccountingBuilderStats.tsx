@@ -391,7 +391,7 @@ const AccountingBuilderRow = ({ builder }: AccountingBuilderRowProps) => {
         {includeLlamaPay && (
           <td className="text-center">
             {builder.llamapayDai && builder.llamapayDai > 0 && (
-              <div className="font-mono font-bold text-lg text-white">{formatDaiAmount(builder.llamapayDai)}</div>
+              <div className="font-mono font-bold text-lg">{formatDaiAmount(builder.llamapayDai)}</div>
             )}
           </td>
         )}
