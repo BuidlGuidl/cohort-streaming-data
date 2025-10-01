@@ -4,6 +4,10 @@ import { useMemo, useState } from "react";
 import { useSharedCsvData } from "~~/hooks/useSharedCsvData";
 import { useCsvStore } from "~~/services/store/csvStore";
 import { useDateStore } from "~~/services/store/dateStore";
+import { useLlamaPayStore } from "~~/services/store/llamapayStore";
+
+type SortField = "name" | "eth" | "dai" | "fiat" | "withdrawals";
+type SortDirection = "asc" | "desc";
 
 // Utility function to format ETH amounts (remove leading zero for amounts < 1)
 const formatEthAmount = (amount: number): string => {
@@ -17,6 +21,11 @@ const formatFiatAmount = (amount: number): string => {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+};
+
+// Utility function to format DAI amounts
+const formatDaiAmount = (amount: number): string => {
+  return Math.round(amount).toLocaleString("en-US");
 };
 
 // Utility function to parse ENS name from Excel hyperlink formula
@@ -78,6 +87,7 @@ interface AccountingBuilderData {
   displayName: string;
   totalEthAmount: number;
   totalFiatAmount: number;
+  llamapayDai?: number;
   withdrawalCount: number;
   withdrawals: Array<{
     ethAmount: number;
@@ -90,6 +100,9 @@ export const AccountingBuilderStats = ({ className = "" }: AccountingBuilderStat
   const { getInternalCohortStreams } = useCsvStore();
   const { startDate, endDate } = useDateStore();
   const { data: sharedData } = useSharedCsvData();
+  const { includeLlamaPay, calculateLlamaPayForBuilder } = useLlamaPayStore();
+  const [sortField, setSortField] = useState<SortField>("eth");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
   // Get local data first, then fall back to shared data
   const localInternalCohortData = getInternalCohortStreams(startDate, endDate);
@@ -179,6 +192,14 @@ export const AccountingBuilderStats = ({ className = "" }: AccountingBuilderStat
       });
     });
 
+    // Add LlamaPay data if enabled
+    if (includeLlamaPay) {
+      builderMap.forEach((builder, address) => {
+        const llamapayDai = calculateLlamaPayForBuilder(address, startDate, endDate);
+        builder.llamapayDai = llamapayDai;
+      });
+    }
+
     // Sort by total ETH amount (descending) and sort each builder's withdrawals by date (newest first)
     const result = Array.from(builderMap.values()).sort((a, b) => b.totalEthAmount - a.totalEthAmount);
 
@@ -192,11 +213,64 @@ export const AccountingBuilderStats = ({ className = "" }: AccountingBuilderStat
     });
 
     return result;
-  }, [internalCohortData]);
+  }, [internalCohortData, includeLlamaPay, calculateLlamaPayForBuilder, startDate, endDate]);
+
+  // Sort builder stats
+  const sortedBuilderStats = useMemo(() => {
+    const sorted = [...builderStats].sort((a, b) => {
+      let aValue: string | number;
+      let bValue: string | number;
+
+      switch (sortField) {
+        case "name":
+          aValue = a.displayName.toLowerCase();
+          bValue = b.displayName.toLowerCase();
+          break;
+        case "eth":
+          aValue = a.totalEthAmount;
+          bValue = b.totalEthAmount;
+          break;
+        case "dai":
+          aValue = a.llamapayDai || 0;
+          bValue = b.llamapayDai || 0;
+          break;
+        case "fiat":
+          aValue = a.totalFiatAmount + (includeLlamaPay ? a.llamapayDai || 0 : 0);
+          bValue = b.totalFiatAmount + (includeLlamaPay ? b.llamapayDai || 0 : 0);
+          break;
+        case "withdrawals":
+          aValue = a.withdrawalCount;
+          bValue = b.withdrawalCount;
+          break;
+        default:
+          return 0;
+      }
+
+      if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    });
+
+    return sorted;
+  }, [builderStats, sortField, sortDirection, includeLlamaPay]);
 
   // Calculate summary stats
-  const totalEthAmount = builderStats.reduce((sum, builder) => sum + builder.totalEthAmount, 0);
-  const totalFiatAmount = builderStats.reduce((sum, builder) => sum + builder.totalFiatAmount, 0);
+  const totalEthAmount = sortedBuilderStats.reduce((sum, builder) => sum + builder.totalEthAmount, 0);
+  const totalFiatAmount = sortedBuilderStats.reduce((sum, builder) => sum + builder.totalFiatAmount, 0);
+  const totalLlamaPayDai = includeLlamaPay
+    ? sortedBuilderStats.reduce((sum, builder) => sum + (builder.llamapayDai || 0), 0)
+    : 0;
+  const totalFiatWithLlamaPay = totalFiatAmount + totalLlamaPayDai; // 1 DAI = 1 USD
+
+  // Handle sort
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDirection("desc");
+    }
+  };
 
   if (internalCohortData.length === 0) {
     return (
@@ -224,7 +298,12 @@ export const AccountingBuilderStats = ({ className = "" }: AccountingBuilderStat
               <h3 className="card-title mb-0">Accounting Cohort Data</h3>
               <div className="flex flex-wrap gap-2">
                 <span className="badge badge-primary badge-lg">Total ETH: {formatEthAmount(totalEthAmount)}</span>
-                <span className="badge badge-success badge-lg">Total FIAT: ${formatFiatAmount(totalFiatAmount)}</span>
+                {includeLlamaPay && totalLlamaPayDai > 0 && (
+                  <span className="badge badge-primary badge-lg">Total DAI: {formatDaiAmount(totalLlamaPayDai)}</span>
+                )}
+                <span className="badge badge-success badge-lg">
+                  Total FIAT: ${formatFiatAmount(includeLlamaPay ? totalFiatWithLlamaPay : totalFiatAmount)}
+                </span>
               </div>
             </div>
           </div>
@@ -233,14 +312,39 @@ export const AccountingBuilderStats = ({ className = "" }: AccountingBuilderStat
             <table className="table">
               <thead>
                 <tr>
-                  <th>Builder</th>
-                  <th className="text-center">Total ETH</th>
-                  <th className="text-center">Total FIAT</th>
-                  <th className="text-center">Withdrawals</th>
+                  <th className="cursor-pointer hover:bg-base-200 select-none" onClick={() => handleSort("name")}>
+                    Builder {sortField === "name" && (sortDirection === "asc" ? "↑" : "↓")}
+                  </th>
+                  <th
+                    className="text-center cursor-pointer hover:bg-base-200 select-none"
+                    onClick={() => handleSort("eth")}
+                  >
+                    Total ETH {sortField === "eth" && (sortDirection === "asc" ? "↑" : "↓")}
+                  </th>
+                  {includeLlamaPay && (
+                    <th
+                      className="text-center cursor-pointer hover:bg-base-200 select-none"
+                      onClick={() => handleSort("dai")}
+                    >
+                      Total DAI {sortField === "dai" && (sortDirection === "asc" ? "↑" : "↓")}
+                    </th>
+                  )}
+                  <th
+                    className="text-center cursor-pointer hover:bg-base-200 select-none"
+                    onClick={() => handleSort("fiat")}
+                  >
+                    Total FIAT {sortField === "fiat" && (sortDirection === "asc" ? "↑" : "↓")}
+                  </th>
+                  <th
+                    className="text-center cursor-pointer hover:bg-base-200 select-none"
+                    onClick={() => handleSort("withdrawals")}
+                  >
+                    Withdrawals {sortField === "withdrawals" && (sortDirection === "asc" ? "↑" : "↓")}
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {builderStats.map((builder, index) => (
+                {sortedBuilderStats.map((builder, index) => (
                   <AccountingBuilderRow key={builder.address} builder={builder} rank={index + 1} />
                 ))}
               </tbody>
@@ -259,6 +363,7 @@ interface AccountingBuilderRowProps {
 
 const AccountingBuilderRow = ({ builder }: AccountingBuilderRowProps) => {
   const [showDetails, setShowDetails] = useState(false);
+  const { includeLlamaPay } = useLlamaPayStore();
 
   return (
     <>
@@ -283,8 +388,17 @@ const AccountingBuilderRow = ({ builder }: AccountingBuilderRowProps) => {
         <td className="text-center">
           <div className="font-mono font-bold text-lg">{formatEthAmount(builder.totalEthAmount)} ETH</div>
         </td>
+        {includeLlamaPay && (
+          <td className="text-center">
+            {builder.llamapayDai && builder.llamapayDai > 0 && (
+              <div className="font-mono font-bold text-lg text-white">{formatDaiAmount(builder.llamapayDai)}</div>
+            )}
+          </td>
+        )}
         <td className="text-center">
-          <div className="font-mono font-bold text-lg">${formatFiatAmount(builder.totalFiatAmount)}</div>
+          <div className="font-mono font-bold text-lg">
+            ${formatFiatAmount(builder.totalFiatAmount + (includeLlamaPay ? builder.llamapayDai || 0 : 0))}
+          </div>
         </td>
         <td className="text-center">
           <span className="badge badge-primary">{builder.withdrawalCount}</span>
@@ -293,7 +407,7 @@ const AccountingBuilderRow = ({ builder }: AccountingBuilderRowProps) => {
 
       {showDetails && (
         <tr>
-          <td colSpan={4}>
+          <td colSpan={includeLlamaPay ? 5 : 4}>
             <div className="bg-base-200 p-4 rounded-lg border-2 border-primary/20 my-2">
               <h4 className="font-semibold mb-3 flex items-center">
                 <span className="mr-2">📋</span>
