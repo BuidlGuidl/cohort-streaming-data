@@ -100,7 +100,7 @@ export const AccountingBuilderStats = ({ className = "" }: AccountingBuilderStat
   const { getInternalCohortStreams } = useCsvStore();
   const { startDate, endDate } = useDateStore();
   const { data: sharedData } = useSharedCsvData();
-  const { includeLlamaPay, calculateLlamaPayForBuilder } = useLlamaPayStore();
+  const { includeLlamaPay, calculateLlamaPayForBuilder, getLlamaPayData } = useLlamaPayStore();
   const [sortField, setSortField] = useState<SortField>("eth");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
@@ -194,14 +194,41 @@ export const AccountingBuilderStats = ({ className = "" }: AccountingBuilderStat
 
     // Add LlamaPay data if enabled
     if (includeLlamaPay) {
+      // First, add LlamaPay data to existing builders
       builderMap.forEach((builder, address) => {
         const llamapayDai = calculateLlamaPayForBuilder(address, startDate, endDate);
         builder.llamapayDai = llamapayDai;
       });
+
+      // Then, add builders who have LlamaPay streams but no ETH withdrawals
+      const llamapayStreams = getLlamaPayData();
+      llamapayStreams.forEach(stream => {
+        const streamAddress = stream.address.toLowerCase();
+        const llamapayDai = calculateLlamaPayForBuilder(streamAddress, startDate, endDate);
+
+        // Only add if they have LlamaPay DAI and aren't already in the map
+        if (llamapayDai > 0 && !builderMap.has(streamAddress)) {
+          builderMap.set(streamAddress, {
+            address: stream.address,
+            displayName: stream.displayName,
+            totalEthAmount: 0,
+            totalFiatAmount: 0,
+            llamapayDai: llamapayDai,
+            withdrawalCount: 0,
+            withdrawals: [],
+          });
+        }
+      });
     }
 
-    // Sort by total ETH amount (descending) and sort each builder's withdrawals by date (newest first)
-    const result = Array.from(builderMap.values()).sort((a, b) => b.totalEthAmount - a.totalEthAmount);
+    // Sort by total ETH amount (descending), then by LlamaPay DAI if ETH amounts are equal
+    const result = Array.from(builderMap.values()).sort((a, b) => {
+      if (b.totalEthAmount !== a.totalEthAmount) {
+        return b.totalEthAmount - a.totalEthAmount;
+      }
+      // If ETH amounts are equal, sort by LlamaPay DAI
+      return (b.llamapayDai || 0) - (a.llamapayDai || 0);
+    });
 
     // Sort each builder's withdrawals by date (newest first)
     result.forEach(builder => {
