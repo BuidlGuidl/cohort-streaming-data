@@ -33,9 +33,11 @@ class ETHPriceService {
     }
 
     const formattedDate = this.formatDateForAPI(date);
+    console.log(`Making API request for date: ${formattedDate}`);
 
     try {
       const response = await fetch(`https://api.coingecko.com/api/v3/coins/ethereum/history?date=${formattedDate}`);
+      console.log(`API response status: ${response.status}`);
 
       if (!response.ok) {
         console.error(`ETH price API request failed with status ${response.status}`);
@@ -50,6 +52,7 @@ class ETHPriceService {
       }
 
       const data = await response.json();
+      console.log(`API response data:`, data);
 
       if (!data.market_data?.current_price?.usd) {
         console.error("No price data found in response:", data);
@@ -57,6 +60,7 @@ class ETHPriceService {
       }
 
       const price = data.market_data.current_price.usd;
+      console.log(`Successfully fetched ETH price: $${price} for ${formattedDate}`);
       this.cache[dateKey] = price;
 
       // Add delay to respect rate limits
@@ -93,13 +97,17 @@ class ETHPriceService {
 
     // Check cache first
     if (this.cache[dateKey]) {
+      console.log(`Using cached ETH price for ${dateKey}: $${this.cache[dateKey]}`);
       return this.cache[dateKey];
     }
+
+    console.log(`Fetching ETH price for ${dateKey}...`);
 
     // Add to queue
     return new Promise(resolve => {
       this.requestQueue.push(async () => {
         const price = await this.fetchETHPrice(date);
+        console.log(`ETH price result for ${dateKey}:`, price);
         resolve(price);
       });
 

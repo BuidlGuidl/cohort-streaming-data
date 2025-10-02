@@ -212,6 +212,13 @@ export const processBuilderWithdrawals = async (
       const ethPrice = ethPrices[dateKey];
       const fiatAmount = ethPrice ? amount * ethPrice : 0;
 
+      console.log(`FIAT calculation for ${event.builder}:`, {
+        amount,
+        dateKey,
+        ethPrice,
+        fiatAmount,
+      });
+
       acc[builderAddress].totalAmount += amount;
       acc[builderAddress].totalFiatAmount += fiatAmount;
       acc[builderAddress].withdrawalCount += 1;
