@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { useSharedCsvData } from "~~/hooks/useSharedCsvData";
 import { useCsvStore } from "~~/services/store/csvStore";
 import { useDateStore } from "~~/services/store/dateStore";
-import { useLlamaPayStore } from "~~/services/store/llamapayStore";
+import { ADDRESS_MAPPINGS, useLlamaPayStore } from "~~/services/store/llamapayStore";
 
 type SortField = "name" | "eth" | "dai" | "fiat" | "withdrawals";
 type SortDirection = "asc" | "desc";
@@ -97,15 +98,59 @@ interface AccountingBuilderData {
 }
 
 export const AccountingBuilderStats = ({ className = "" }: AccountingBuilderStatsProps) => {
-  const { getInternalCohortStreams } = useCsvStore();
+  const csvData = useCsvStore(useShallow(state => state.csvData));
   const { startDate, endDate } = useDateStore();
   const { data: sharedData } = useSharedCsvData();
-  const { includeLlamaPay, calculateLlamaPayForBuilder, getLlamaPayData } = useLlamaPayStore();
+  const includeLlamaPay = useLlamaPayStore(state => state.includeLlamaPay);
+  const calculateLlamaPayForBuilderRaw = useLlamaPayStore(state => state.calculateLlamaPayForBuilder);
+  const getLlamaPayDataRaw = useLlamaPayStore(state => state.getLlamaPayData);
+
+  // Wrap in useCallback to ensure stable references
+  const calculateLlamaPayForBuilder = useCallback(
+    (address: string, start: string, end: string) => {
+      return calculateLlamaPayForBuilderRaw(address, start, end);
+    },
+    [calculateLlamaPayForBuilderRaw],
+  );
+
+  const getLlamaPayData = useCallback(() => {
+    return getLlamaPayDataRaw();
+  }, [getLlamaPayDataRaw]);
   const [sortField, setSortField] = useState<SortField>("eth");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
-  // Get local data first, then fall back to shared data
-  const localInternalCohortData = getInternalCohortStreams(startDate, endDate);
+  // Get local data by filtering csvData directly
+  const localInternalCohortData = useMemo(() => {
+    let filtered = csvData.filter(transaction => {
+      const account = transaction.account || "";
+      // Match "09-Internal Cohort Streams" or anything with "internal cohort" in it
+      return account.toLowerCase().includes("internal cohort");
+    });
+
+    // Filter by date if provided
+    if (startDate || endDate) {
+      filtered = filtered.filter(transaction => {
+        const dateStr = transaction["Date Time"] || transaction["date"] || transaction["Date"] || "";
+        if (!dateStr) return true;
+
+        const transactionDate = new Date(dateStr);
+        if (isNaN(transactionDate.getTime())) return true;
+
+        if (startDate) {
+          const start = new Date(startDate);
+          if (transactionDate < start) return false;
+        }
+        if (endDate) {
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+          if (transactionDate > end) return false;
+        }
+        return true;
+      });
+    }
+
+    return filtered;
+  }, [csvData, startDate, endDate]);
 
   // Filter shared data by date range and internal cohort streams
   const sharedInternalCohortData = useMemo(() => {
@@ -135,10 +180,13 @@ export const AccountingBuilderStats = ({ className = "" }: AccountingBuilderStat
   }, [sharedData?.data, startDate, endDate]);
 
   // Use local data if available, otherwise use shared data
-  const internalCohortData = localInternalCohortData.length > 0 ? localInternalCohortData : sharedInternalCohortData;
 
-  // Process CSV data into builder stats
-  const builderStats = useMemo(() => {
+  const internalCohortData = useMemo(() => {
+    return localInternalCohortData.length > 0 ? localInternalCohortData : sharedInternalCohortData;
+  }, [localInternalCohortData, sharedInternalCohortData]);
+
+  // Process CSV data into builder stats (without LlamaPay to avoid re-render issues)
+  const builderStatsWithoutLlamaPay = useMemo(() => {
     const builderMap = new Map<string, AccountingBuilderData>();
 
     internalCohortData.forEach(transaction => {
@@ -157,23 +205,33 @@ export const AccountingBuilderStats = ({ className = "" }: AccountingBuilderStat
       if (!builderAddress) return;
 
       // Parse display name (ENS) from the hyperlink
-      const displayName = parseEnsFromHyperlink(toField);
+      let displayName = parseEnsFromHyperlink(toField);
 
-      if (!builderMap.has(builderAddress)) {
-        // Clean up display name - if it's not a valid ENS or clean name, fall back to address
-        let cleanDisplayName = displayName;
-        if (
-          !cleanDisplayName ||
-          cleanDisplayName.includes("=HYPERLINK") ||
-          cleanDisplayName.includes("https://") ||
-          cleanDisplayName.length > 50
-        ) {
-          cleanDisplayName = builderAddress.slice(0, 6) + "..." + builderAddress.slice(-4);
-        }
+      // Apply address mappings to consolidate multiple addresses to one display name
+      const mappedDisplayName = ADDRESS_MAPPINGS[builderAddress];
+      if (mappedDisplayName) {
+        displayName = mappedDisplayName;
+      }
 
-        builderMap.set(builderAddress, {
+      // Use displayName as the key for consolidation (instead of address)
+      // This ensures multiple addresses for same person are combined
+      let consolidationKey = displayName;
+
+      // Clean up display name - if it's not a valid ENS or clean name, use address as key
+      if (
+        !displayName ||
+        displayName.includes("=HYPERLINK") ||
+        displayName.includes("https://") ||
+        displayName.length > 50
+      ) {
+        consolidationKey = builderAddress;
+        displayName = builderAddress.slice(0, 6) + "..." + builderAddress.slice(-4);
+      }
+
+      if (!builderMap.has(consolidationKey)) {
+        builderMap.set(consolidationKey, {
           address: builderAddress,
-          displayName: cleanDisplayName,
+          displayName: displayName,
           totalEthAmount: 0,
           totalFiatAmount: 0,
           withdrawalCount: 0,
@@ -181,9 +239,10 @@ export const AccountingBuilderStats = ({ className = "" }: AccountingBuilderStat
         });
       }
 
-      const builder = builderMap.get(builderAddress)!;
-      builder.totalEthAmount += transaction.ethOut;
-      builder.totalFiatAmount += transaction.fiatOut;
+      const builder = builderMap.get(consolidationKey)!;
+
+      builder.totalEthAmount += transaction.ethOut || 0;
+      builder.totalFiatAmount += transaction.fiatOut || 0;
       builder.withdrawalCount += 1;
       builder.withdrawals.push({
         ethAmount: transaction.ethOut,
@@ -192,51 +251,8 @@ export const AccountingBuilderStats = ({ className = "" }: AccountingBuilderStat
       });
     });
 
-    // Add LlamaPay data if enabled
-    if (includeLlamaPay) {
-      // First, add LlamaPay data to existing builders
-      builderMap.forEach((builder, address) => {
-        const llamapayDai = calculateLlamaPayForBuilder(address, startDate, endDate);
-        builder.llamapayDai = llamapayDai;
-      });
-
-      // Then, add builders who have LlamaPay streams but no ETH withdrawals
-      const llamapayStreams = getLlamaPayData();
-      const processedDisplayNames = new Set<string>();
-
-      llamapayStreams.forEach(stream => {
-        const streamAddress = stream.address.toLowerCase();
-        const llamapayDai = calculateLlamaPayForBuilder(streamAddress, startDate, endDate);
-
-        // Check if this display name is already in the map
-        const isAlreadyInMap = Array.from(builderMap.values()).some(builder => {
-          return builder.displayName === stream.displayName;
-        });
-
-        // Only add if they have LlamaPay DAI and this display name isn't already in the map
-        if (llamapayDai > 0 && !isAlreadyInMap && !processedDisplayNames.has(stream.displayName)) {
-          builderMap.set(streamAddress, {
-            address: stream.address,
-            displayName: stream.displayName,
-            totalEthAmount: 0,
-            totalFiatAmount: 0,
-            llamapayDai: llamapayDai,
-            withdrawalCount: 0,
-            withdrawals: [],
-          });
-          processedDisplayNames.add(stream.displayName);
-        }
-      });
-    }
-
-    // Sort by total ETH amount (descending), then by LlamaPay DAI if ETH amounts are equal
-    const result = Array.from(builderMap.values()).sort((a, b) => {
-      if (b.totalEthAmount !== a.totalEthAmount) {
-        return b.totalEthAmount - a.totalEthAmount;
-      }
-      // If ETH amounts are equal, sort by LlamaPay DAI
-      return (b.llamapayDai || 0) - (a.llamapayDai || 0);
-    });
+    // Convert to array (LlamaPay data will be added separately)
+    const result = Array.from(builderMap.values());
 
     // Sort each builder's withdrawals by date (newest first)
     result.forEach(builder => {
@@ -248,7 +264,53 @@ export const AccountingBuilderStats = ({ className = "" }: AccountingBuilderStat
     });
 
     return result;
-  }, [internalCohortData, includeLlamaPay, calculateLlamaPayForBuilder, startDate, endDate]);
+  }, [internalCohortData]);
+
+  // Add LlamaPay data separately to avoid re-render loop
+  const builderStats = useMemo(() => {
+    if (!includeLlamaPay) {
+      return builderStatsWithoutLlamaPay;
+    }
+
+    // Create a copy and add LlamaPay data
+    const statsWithLlamaPay = builderStatsWithoutLlamaPay.map(builder => {
+      const llamapayDai = calculateLlamaPayForBuilder(builder.address, startDate, endDate);
+      return {
+        ...builder,
+        llamapayDai,
+      };
+    });
+
+    // Add builders who only have LlamaPay streams
+    const llamapayStreams = getLlamaPayData();
+    const processedDisplayNames = new Set(statsWithLlamaPay.map(b => b.displayName));
+
+    llamapayStreams.forEach(stream => {
+      const streamAddress = stream.address.toLowerCase();
+      const llamapayDai = calculateLlamaPayForBuilder(streamAddress, startDate, endDate);
+
+      if (llamapayDai > 0 && !processedDisplayNames.has(stream.displayName)) {
+        statsWithLlamaPay.push({
+          address: stream.address,
+          displayName: stream.displayName,
+          totalEthAmount: 0,
+          totalFiatAmount: 0,
+          llamapayDai: llamapayDai,
+          withdrawalCount: 0,
+          withdrawals: [],
+        });
+        processedDisplayNames.add(stream.displayName);
+      }
+    });
+
+    // Sort by total ETH amount (descending), then by LlamaPay DAI if ETH amounts are equal
+    return statsWithLlamaPay.sort((a, b) => {
+      if (b.totalEthAmount !== a.totalEthAmount) {
+        return b.totalEthAmount - a.totalEthAmount;
+      }
+      return (b.llamapayDai || 0) - (a.llamapayDai || 0);
+    });
+  }, [builderStatsWithoutLlamaPay, includeLlamaPay, calculateLlamaPayForBuilder, getLlamaPayData, startDate, endDate]);
 
   // Sort builder stats
   const sortedBuilderStats = useMemo(() => {
@@ -380,7 +442,7 @@ export const AccountingBuilderStats = ({ className = "" }: AccountingBuilderStat
               </thead>
               <tbody>
                 {sortedBuilderStats.map((builder, index) => (
-                  <AccountingBuilderRow key={builder.address} builder={builder} rank={index + 1} />
+                  <AccountingBuilderRow key={builder.displayName} builder={builder} rank={index + 1} />
                 ))}
               </tbody>
             </table>

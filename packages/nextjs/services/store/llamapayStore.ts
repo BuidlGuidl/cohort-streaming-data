@@ -134,12 +134,14 @@ const LLAMAPAY_STREAMS: LlamaPayStream[] = [
 ];
 
 // Address mappings for combining streams from same person
-const ADDRESS_MAPPINGS: Record<string, string> = {
+export const ADDRESS_MAPPINGS: Record<string, string> = {
   "0x1990a6bcdb13d33463cba884a1ae6020292523e8": "carletex.eth", // inc.carletex.eth -> carletex.eth
   "0x53e90aa7eddedb58a2da1698028501c56c53978f": "zakgriffith.eth", // frogbaseball.eth -> zakgriffith.eth
   "0xfe952cb6f4b8f4acd5337153da5c7c93dc3e44e1": "zakgriffith.eth", // zakgriffith.eth -> zakgriffith.eth (same person as frogbaseball.eth)
   "0x4cbe80191e63567191668d860acabaf15dac5512": "andrealbiac.eth", // andrealbiac.eth -> andrealbiac.eth
   "0xd04981840264a63df979064cbd6e4f7041df3f0e": "andrealbiac.eth", // andrealb.eth -> andrealbiac.eth
+  "0x699bfac97c962db31238b429ceaf6734c492d61c": "baluuu.eth", // phipsae.eth -> baluuu.eth (same person)
+  "0x45334f41aaa464528cd5bc0f582acadc49eb0cd1": "0xrinat.eth", // oxrinat.eth Streams -> 0xrinat.eth
 };
 
 // Helper function to get the effective rate for a given date
