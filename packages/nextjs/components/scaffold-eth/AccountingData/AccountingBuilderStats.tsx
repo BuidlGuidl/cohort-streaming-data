@@ -202,12 +202,19 @@ export const AccountingBuilderStats = ({ className = "" }: AccountingBuilderStat
 
       // Then, add builders who have LlamaPay streams but no ETH withdrawals
       const llamapayStreams = getLlamaPayData();
+      const processedDisplayNames = new Set<string>();
+
       llamapayStreams.forEach(stream => {
         const streamAddress = stream.address.toLowerCase();
         const llamapayDai = calculateLlamaPayForBuilder(streamAddress, startDate, endDate);
 
-        // Only add if they have LlamaPay DAI and aren't already in the map
-        if (llamapayDai > 0 && !builderMap.has(streamAddress)) {
+        // Check if this display name is already in the map
+        const isAlreadyInMap = Array.from(builderMap.values()).some(builder => {
+          return builder.displayName === stream.displayName;
+        });
+
+        // Only add if they have LlamaPay DAI and this display name isn't already in the map
+        if (llamapayDai > 0 && !isAlreadyInMap && !processedDisplayNames.has(stream.displayName)) {
           builderMap.set(streamAddress, {
             address: stream.address,
             displayName: stream.displayName,
@@ -217,6 +224,7 @@ export const AccountingBuilderStats = ({ className = "" }: AccountingBuilderStat
             withdrawalCount: 0,
             withdrawals: [],
           });
+          processedDisplayNames.add(stream.displayName);
         }
       });
     }
