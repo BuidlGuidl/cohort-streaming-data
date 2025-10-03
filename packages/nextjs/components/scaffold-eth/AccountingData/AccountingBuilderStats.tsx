@@ -213,6 +213,15 @@ export const AccountingBuilderStats = ({ className = "" }: AccountingBuilderStat
         displayName = mappedDisplayName;
       }
 
+      // Also check if the displayName itself needs to be remapped (for ENS name variations)
+      // This handles cases where the same person has multiple ENS names
+      const displayNameMapping: Record<string, string> = {
+        "andrealb.eth": "andrealbiac.eth",
+      };
+      if (displayNameMapping[displayName]) {
+        displayName = displayNameMapping[displayName];
+      }
+
       // Use displayName as the key for consolidation (instead of address)
       // This ensures multiple addresses for same person are combined
       let consolidationKey = displayName;
@@ -483,13 +492,15 @@ const AccountingBuilderRow = ({ builder }: AccountingBuilderRowProps) => {
           )}
         </td>
         <td className="text-center">
-          <div className="font-mono font-bold text-lg">{formatEthAmount(builder.totalEthAmount)} ETH</div>
+          <div className="font-mono font-bold text-lg">
+            {builder.totalEthAmount === 0 ? "-" : formatEthAmount(builder.totalEthAmount)}
+          </div>
         </td>
         {includeLlamaPay && (
           <td className="text-center">
-            {builder.llamapayDai && builder.llamapayDai > 0 && (
-              <div className="font-mono font-bold text-lg">{formatDaiAmount(builder.llamapayDai)}</div>
-            )}
+            <div className="font-mono font-bold text-lg">
+              {!builder.llamapayDai || builder.llamapayDai === 0 ? "-" : formatDaiAmount(builder.llamapayDai)}
+            </div>
           </td>
         )}
         <td className="text-center">

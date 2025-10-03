@@ -253,9 +253,7 @@ const BuilderRow = ({ builder }: BuilderRowProps) => {
         {includeLlamaPay && (
           <td className="text-center">
             {(builder as any).llamapayDai > 0 && (
-              <div className="font-mono font-bold text-lg text-green-600">
-                {formatDaiAmount((builder as any).llamapayDai)}
-              </div>
+              <div className="font-mono font-bold text-lg">{formatDaiAmount((builder as any).llamapayDai)}</div>
             )}
           </td>
         )}
