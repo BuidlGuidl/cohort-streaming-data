@@ -10,9 +10,8 @@ import {
 } from "~~/hooks/ponder";
 import { useDateStore } from "~~/services/store/dateStore";
 import { useLlamaPayStore } from "~~/services/store/llamapayStore";
-
-type SortField = "name" | "eth" | "dai" | "withdrawals";
-type SortDirection = "asc" | "desc";
+import { useSortStore } from "~~/services/store/sortStore";
+import type { SortField } from "~~/services/store/sortStore";
 
 // Utility function to format ETH amounts (remove leading zero for amounts < 1)
 const formatEthAmount = (amount: number): string => {
@@ -33,8 +32,7 @@ export const BuilderStats = ({ className = "" }: BuilderStatsProps) => {
   // Use shared date store
   const { startDate, endDate } = useDateStore();
   const { includeLlamaPay, calculateLlamaPayForBuilder } = useLlamaPayStore();
-  const [sortField, setSortField] = useState<SortField>("eth");
-  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const { sortField, sortDirection, toggleSort } = useSortStore();
 
   // Fetch data
   const { data: cohortInfo, isLoading: isLoadingCohorts } = useCohortInformation();
@@ -125,12 +123,7 @@ export const BuilderStats = ({ className = "" }: BuilderStatsProps) => {
 
   // Handle sort
   const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortDirection("desc");
-    }
+    toggleSort(field);
   };
 
   return (

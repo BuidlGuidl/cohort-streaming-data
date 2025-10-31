@@ -6,9 +6,8 @@ import { useSharedCsvData } from "~~/hooks/useSharedCsvData";
 import { useCsvStore } from "~~/services/store/csvStore";
 import { useDateStore } from "~~/services/store/dateStore";
 import { ADDRESS_MAPPINGS, useLlamaPayStore } from "~~/services/store/llamapayStore";
-
-type SortField = "name" | "eth" | "dai" | "fiat" | "withdrawals";
-type SortDirection = "asc" | "desc";
+import { useSortStore } from "~~/services/store/sortStore";
+import type { SortField } from "~~/services/store/sortStore";
 
 // Utility function to format ETH amounts (remove leading zero for amounts < 1)
 const formatEthAmount = (amount: number): string => {
@@ -116,8 +115,7 @@ export const AccountingBuilderStats = ({ className = "" }: AccountingBuilderStat
   const getLlamaPayData = useCallback(() => {
     return getLlamaPayDataRaw();
   }, [getLlamaPayDataRaw]);
-  const [sortField, setSortField] = useState<SortField>("eth");
-  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const { sortField, sortDirection, toggleSort } = useSortStore();
 
   // Get local data by filtering csvData directly
   const localInternalCohortData = useMemo(() => {
@@ -370,12 +368,7 @@ export const AccountingBuilderStats = ({ className = "" }: AccountingBuilderStat
 
   // Handle sort
   const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortDirection("desc");
-    }
+    toggleSort(field);
   };
 
   if (internalCohortData.length === 0) {
